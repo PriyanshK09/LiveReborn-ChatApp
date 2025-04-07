@@ -1,0 +1,121 @@
+/* Features Section */
+  .features-section {
+    padding: 6rem 0;
+    background-color: var(--bg-light);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  @media (min-width: 768px) {
+    .features-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .features-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .feature-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* About Section */
+  .about-section {
+    padding: 6rem 0;
+    background-color: var(--bg-light);
+  }
+  
+  .about-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3rem;
+  }
+  
+  @media (min-width: 768px) {
+    .about-content {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+  
+  .about-text {
+    max-width: 600px;
+  }
+  
+  .about-text .badge {
+    margin-bottom: 1rem;
+    display: inline-flex;
+  }
+  
+  .about-description {
+    font-size: 1.125rem;
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+  }
+  
+  .about-features {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  
+  @media (min-width: 640px) {
+    .about-features {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  .about-feature {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .about-feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius-full);
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+  
+  .about-image {
+    width: 100%;
+    max-width: 500px;
+    border-radius: var(--border-radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .campus-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform var(--transition-normal);
+  }
+  
+  .about-image:hover .campus-image {
+    transform: scale(1.05);
+  }
+

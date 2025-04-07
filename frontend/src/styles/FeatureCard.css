@@ -1,0 +1,255 @@
+.feature-card {
+  background-color: white;
+  border-radius: var(--border-radius-xl);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08);
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1;
+  transform: translateZ(0);
+}
+
+.feature-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  z-index: 1;
+}
+
+.feature-card.feature-orange::before {
+  background: linear-gradient(to right, #ff8c00, #ffa94d);
+}
+
+.feature-card.feature-blue::before {
+  background: linear-gradient(to right, #3b82f6, #60a5fa);
+}
+
+.feature-card.feature-green::before {
+  background: linear-gradient(to right, #10b981, #34d399);
+}
+
+.feature-card.feature-purple::before {
+  background: linear-gradient(to right, #8b5cf6, #a78bfa);
+}
+
+.feature-card:hover {
+  transform: translateY(-15px) translateZ(0);
+  box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.15);
+}
+
+.feature-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom right, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.feature-card:hover::after {
+  opacity: 1;
+}
+
+.feature-card-inner {
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.feature-icon-container {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--border-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon-container {
+  transform: scale(1.1);
+}
+
+.icon-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.15;
+  z-index: 0;
+  transition: all 0.3s ease;
+}
+
+.feature-icon-container.orange .icon-background {
+  background-color: #ff8c00;
+}
+
+.feature-icon-container.blue .icon-background {
+  background-color: #3b82f6;
+}
+
+.feature-icon-container.green .icon-background {
+  background-color: #10b981;
+}
+
+.feature-icon-container.purple .icon-background {
+  background-color: #8b5cf6;
+}
+
+.feature-card:hover .icon-background {
+  opacity: 0.25;
+  transform: scale(1.2);
+}
+
+.feature-icon {
+  height: 30px;
+  width: 30px;
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.1);
+}
+
+.feature-orange .feature-icon {
+  color: #ff8c00;
+}
+
+.feature-blue .feature-icon {
+  color: #3b82f6;
+}
+
+.feature-green .feature-icon {
+  color: #10b981;
+}
+
+.feature-purple .feature-icon {
+  color: #8b5cf6;
+}
+
+.feature-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.feature-title::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  transition: width 0.3s ease;
+  border-radius: var(--border-radius-full);
+}
+
+.feature-orange .feature-title::after {
+  background-color: #ff8c00;
+}
+
+.feature-blue .feature-title::after {
+  background-color: #3b82f6;
+}
+
+.feature-green .feature-title::after {
+  background-color: #10b981;
+}
+
+.feature-purple .feature-title::after {
+  background-color: #8b5cf6;
+}
+
+.feature-card:hover .feature-title::after {
+  width: 40px;
+}
+
+.feature-description {
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+  flex-grow: 1;
+  line-height: 1.6;
+}
+
+.feature-link {
+  margin-top: auto;
+  transform: translateY(5px);
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-link {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.feature-link a {
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.feature-orange .feature-link a {
+  color: #ff8c00;
+}
+
+.feature-blue .feature-link a {
+  color: #3b82f6;
+}
+
+.feature-green .feature-link a {
+  color: #10b981;
+}
+
+.feature-purple .feature-link a {
+  color: #8b5cf6;
+}
+
+.feature-link a::after {
+  content: "→";
+  margin-left: 0.5rem;
+  transition: transform 0.3s ease;
+}
+
+.feature-link a:hover::after {
+  transform: translateX(5px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .feature-card-inner {
+    padding: 2rem 1.5rem;
+  }
+
+  .feature-icon-container {
+    width: 60px;
+    height: 60px;
+  }
+
+  .feature-title {
+    font-size: 1.25rem;
+  }
+}
+
