@@ -324,6 +324,31 @@
   transform: translateX(4px);
 }
 
+.error-message {
+  color: #e53e3e;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  background-color: rgba(229, 62, 62, 0.1);
+  padding: 0.5rem;
+  border-radius: var(--border-radius-md);
+  border-left: 3px solid #e53e3e;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 480px) {
   .login-card {
     padding: 2rem 1.5rem;
