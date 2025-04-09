@@ -1,5 +1,6 @@
 import Button from "./Button"
 import { ArrowRight } from "lucide-react"
+import ScrollLink from "./ScrollLink"
 import "../styles/CTASection.css"
 
 function CTASection() {
@@ -10,9 +11,11 @@ function CTASection() {
         <p className="cta-description">
           Join thousands of LPU students and faculty and experience the future of campus messaging today.
         </p>
-        <Button size="large" variant="secondary" className="cta-button">
-          Get Started Now <ArrowRight className="button-icon" />
-        </Button>
+        <ScrollLink to="/login">
+          <Button size="large" variant="secondary" className="cta-button">
+            Get Started Now <ArrowRight className="button-icon" />
+          </Button>
+        </ScrollLink>
       </div>
     </section>
   )

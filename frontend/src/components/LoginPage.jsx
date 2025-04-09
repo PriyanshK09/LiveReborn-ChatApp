@@ -69,7 +69,7 @@ function LoginPage() {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="login-form-group">
             <label htmlFor="regno" className="form-label">Registration Number</label>
             <div className="input-container">
               <User size={18} className="input-icon" />
@@ -86,11 +86,8 @@ function LoginPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <div className="password-header">
-              <label htmlFor="password" className="form-label">Password</label>
-              <a href="https://ums.lpu.in/lpuums/forgetpassword.aspx" target="_blank" rel="noopener noreferrer" className="forgot-password-link">Forgot password?</a>
-            </div>
+          <div className="login-form-group">
+            <label htmlFor="password" className="form-label">Password</label>
             <div className="input-container">
               <Lock size={18} className="input-icon" />
               <input
@@ -108,12 +105,25 @@ function LoginPage() {
 
           {error && <p className="error-message">{error}</p>}
 
-          <div className="remember-me">
+          <div className="remember-forgot">
             <label className="checkbox-container">
               <input type="checkbox" id="remember" />
               <span className="checkmark"></span>
               Remember me
             </label>
+            <a
+              href="https://ums.lpu.in/lpuums/forgetpassword.aspx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="forgot-password-link"
+              onClick={(e) => {
+                if (!window.confirm("Are you sure you want to navigate to the Forgot Password page?")) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              Forgot password?
+            </a>
           </div>
 
           <Button type="submit" className="login-button" variant="primary" disabled={loading}>

@@ -1,5 +1,6 @@
 import { Twitter, Github, Instagram } from "lucide-react"
 import "../styles/Footer.css"
+import ScrollLink from "./ScrollLink"
 
 function Footer() {
   return (
@@ -28,19 +29,14 @@ function Footer() {
             <h3 className="footer-heading">Platform</h3>
             <ul className="footer-list">
               <li>
-                <a href="#" className="footer-link">
+                <a href="/#features" className="footer-link">
                   Features
                 </a>
               </li>
               <li>
-                <a href="#" className="footer-link">
-                  Security
-                </a>
-              </li>
-              <li>
-                <a href="#" className="footer-link">
+                <ScrollLink to="/faq" className="footer-link">
                   FAQ
-                </a>
+                </ScrollLink>
               </li>
             </ul>
           </div>
@@ -48,22 +44,22 @@ function Footer() {
             <h3 className="footer-heading">University</h3>
             <ul className="footer-list">
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/about-lpu/" className="footer-link" target="_blank" rel="noopener noreferrer">
                   About LPU
                 </a>
               </li>
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/newsreleasehome.aspx" className="footer-link" target="_blank" rel="noopener noreferrer">
                   Campus News
                 </a>
               </li>
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/campus-life/campus-events.php" className="footer-link" target="_blank" rel="noopener noreferrer">
                   Events
                 </a>
               </li>
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/contact-us/contact-us.php" className="footer-link" target="_blank" rel="noopener noreferrer">
                   Contact
                 </a>
               </li>
@@ -73,18 +69,13 @@ function Footer() {
             <h3 className="footer-heading">Legal</h3>
             <ul className="footer-list">
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/privacy-lpulive.php" className="footer-link" target="_blank" rel="noopener noreferrer">
                   Privacy Policy
                 </a>
               </li>
               <li>
-                <a href="#" className="footer-link">
+                <a href="https://www.lpu.in/terms-conditions.php" className="footer-link" target="_blank" rel="noopener noreferrer">
                   Terms of Service
-                </a>
-              </li>
-              <li>
-                <a href="#" className="footer-link">
-                  Cookie Policy
                 </a>
               </li>
             </ul>

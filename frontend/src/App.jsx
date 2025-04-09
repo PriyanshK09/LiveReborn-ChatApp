@@ -9,45 +9,53 @@ import AboutSection from "./components/AboutSection"
 import CTASection from "./components/CTASection"
 import Footer from "./components/Footer"
 import LoginPage from "./components/LoginPage"
+import ProfilePage from "./components/ProfilePage"
+import ScrollToTop from "./components/ScrollToTop"
+import FAQPage from './pages/FAQPage';
 import "./styles/App.css"
 import AOS from "aos"
 import "aos/dist/aos.css"
 
 function App() {
-  const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-
+  
+  // Initialize AOS (Animate on Scroll) and scroll handling
   useEffect(() => {
-    // Scroll to top on page load
-    window.scrollTo({ top: 0, behavior: "smooth" })
-
-    // Initialize AOS for animations
-    AOS.init({ duration: 1000, once: true })
+    AOS.init({
+      duration: 800,
+      easing: "ease-in-out",
+      once: true,
+      mirror: false,
+    })
+    
+    // Disable browser's auto scroll restoration
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    
+    // Handle initial page load
+    window.scrollTo(0, 0);
+    
+    // Handle page refresh
+    window.addEventListener('beforeunload', () => {
+      window.scrollTo(0, 0);
+    });
+    
+    return () => {
+      window.removeEventListener('beforeunload', () => {
+        window.scrollTo(0, 0);
+      });
+    }
   }, [])
 
+  // Handle click outside mobile menu
   useEffect(() => {
-    const handleScroll = () => {
-      const isScrolled = window.scrollY > 20
-      if (isScrolled !== scrolled) {
-        setScrolled(isScrolled)
-      }
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-    }
-  }, [scrolled])
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const navContainer = document.querySelector(".header-nav")
-      const mobileButton = document.querySelector(".header-menu-toggle")
-
+    const mobileButton = document.querySelector(".header-menu-toggle")
+    
+    function handleClickOutside(event) {
       if (
         menuOpen &&
-        navContainer &&
-        !navContainer.contains(event.target) &&
+        !event.target.closest(".header-nav") &&
         mobileButton &&
         !mobileButton.contains(event.target)
       ) {
@@ -76,7 +84,8 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        <Header scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+        <ScrollToTop />
+        <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
         <Routes>
           <Route
             path="/"
@@ -90,6 +99,8 @@ function App() {
             }
           />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/faq" element={<FAQPage />} />
         </Routes>
         <Footer />
       </div>
