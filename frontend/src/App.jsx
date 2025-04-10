@@ -12,6 +12,7 @@ import LoginPage from "./components/LoginPage"
 import ProfilePage from "./components/ProfilePage"
 import ScrollToTop from "./components/ScrollToTop"
 import FAQPage from './pages/FAQPage';
+import ChatPage from "./pages/ChatPage"
 import "./styles/App.css"
 import AOS from "aos"
 import "aos/dist/aos.css"
@@ -101,6 +102,8 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/faq" element={<FAQPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="*" element={<h1>404 Not Found</h1>} />
         </Routes>
         <Footer />
       </div>

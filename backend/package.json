@@ -17,6 +17,7 @@
     "express": "^5.1.0",
     "jsdom": "^26.0.0",
     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.13.2",
     "puppeteer": "^21.11.0"
   },
   "devDependencies": {

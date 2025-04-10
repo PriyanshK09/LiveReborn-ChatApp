@@ -111,14 +111,26 @@ function Header({ menuOpen, setMenuOpen }) {
                 aria-expanded={dropdownOpen}
                 aria-haspopup="true"
               >
-                <div className="user-avatar">{firstName?.charAt(0) || "U"}</div>
+                {user.profilePicture ? (
+                  <div className="user-avatar-image">
+                    <img src={`http://localhost:5000${user.profilePicture}`} alt={user.name} />
+                  </div>
+                ) : (
+                  <div className="user-avatar">{firstName?.charAt(0) || "U"}</div>
+                )}
                 <span className="user-name">Hi, {firstName}</span>
                 <ChevronDown size={16} className={`dropdown-icon ${dropdownOpen ? "open" : ""}`} />
               </button>
 
               <div className={`dropdown-menu ${dropdownOpen ? "dropdown-visible" : ""}`}>
                 <div className="dropdown-header">
-                  <div className="dropdown-avatar">{firstName?.charAt(0) || "U"}</div>
+                  {user.profilePicture ? (
+                    <div className="dropdown-avatar-image">
+                      <img src={`http://localhost:5000${user.profilePicture}`} alt={user.name} />
+                    </div>
+                  ) : (
+                    <div className="dropdown-avatar">{firstName?.charAt(0) || "U"}</div>
+                  )}
                   <div className="dropdown-user-info">
                     <span className="dropdown-username">{user.name}</span>
                     <span className="dropdown-userrole">LPU Student</span>
