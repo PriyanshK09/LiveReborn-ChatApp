@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import bcrypt from 'bcrypt'; // Add bcrypt for password hashing
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +31,7 @@ const userSchema = new mongoose.Schema({
   email: String,
   department: String,
   profilePicture: String,
+  password: String, // Add password field to store hashed passwords
 });
 const UserData = mongoose.model('UserData', userSchema);
 
@@ -59,7 +61,39 @@ app.post('/login', async (req, res) => {
   }
 
   try {
-    console.log('Launching Puppeteer...');
+    // Check if user already exists in database
+    const existingUser = await UserData.findOne({ regno });
+    
+    // If user exists, try to authenticate with stored password
+    if (existingUser && existingUser.password) {
+      // Compare the provided password with the stored hash
+      const passwordMatch = await bcrypt.compare(password, existingUser.password);
+      
+      if (passwordMatch) {
+        console.log('User authenticated using database');
+        
+        // Generate JWT token
+        const token = jwt.sign({ regno }, JWT_SECRET, { expiresIn: '1h' });
+        
+        return res.json({
+          message: 'Login successful',
+          token,
+          user: { 
+            name: existingUser.name, 
+            regno: existingUser.regno,
+            department: existingUser.department,
+            profilePicture: existingUser.profilePicture
+          },
+          userData: existingUser
+        });
+      }
+      
+      // If password doesn't match, fall through to UMS authentication
+      console.log('Stored password does not match, falling back to UMS authentication');
+    }
+
+    // If user doesn't exist or password doesn't match, authenticate via UMS
+    console.log('Launching Puppeteer for UMS authentication...');
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
@@ -101,6 +135,38 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // UMS authentication successful
+
+    // If user exists but we're doing UMS auth (likely because password didn't match),
+    // we should update their password in the database
+    if (existingUser) {
+      console.log('User exists but required UMS authentication, updating password in database');
+      // Hash the password before storing
+      const hashedPassword = await bcrypt.hash(password, 10);
+      existingUser.password = hashedPassword;
+      await existingUser.save();
+      
+      await browser.close();
+      
+      // Generate JWT token
+      const token = jwt.sign({ regno }, JWT_SECRET, { expiresIn: '1h' });
+      
+      return res.json({
+        message: 'Login successful',
+        token,
+        user: { 
+          name: existingUser.name, 
+          regno: existingUser.regno,
+          department: existingUser.department,
+          profilePicture: existingUser.profilePicture
+        },
+        userData: existingUser
+      });
+    }
+
+    // New user or user data needs to be scraped
+    console.log('New user, scraping data from UMS...');
+    
     // Step 7: Navigate to the StudentDashboard.aspx page
     console.log('Navigating to Student Dashboard...');
     await page.goto('https://ums.lpu.in/lpuums/StudentDashboard.aspx', { 
@@ -367,18 +433,22 @@ app.post('/login', async (req, res) => {
 
     console.log('Final user data:', { name, regno: regnoExtracted || regno, department, profilePicture: imagePath });
 
+    // Hash the password before storing in the database
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const userData = { 
       regno: regnoExtracted || regno, 
       name: name !== 'Unknown' ? name : 'LPU Student', // Use a better default name if unknown
       department, 
       profilePicture: imagePath,
-      email: `${regnoExtracted || regno}@lpu.in` // Generate school email as fallback
+      email: `${regnoExtracted || regno}@lpu.in`, // Generate school email as fallback
+      password: hashedPassword // Store the hashed password
     };
 
     // Save user data to MongoDB
     await UserData.findOneAndUpdate({ regno: regnoExtracted || regno }, userData, { upsert: true, new: true });
 
-    console.log('User data saved to MongoDB');
+    console.log('User data saved to MongoDB with hashed password');
 
     console.log('Login successful!');
     await browser.close();
@@ -393,7 +463,7 @@ app.post('/login', async (req, res) => {
         name, 
         regno: regnoExtracted || regno,
         department,
-        profilePicture: imagePath // Ensure this is the relative path
+        profilePicture: imagePath
       },
       userData
     });
