@@ -23,7 +23,7 @@ import "../styles/ChatPage.css"
 
 function ChatPage() {
   const navigate = useNavigate()
-  const [activeChat, setActiveChat] = useState(0)
+  const [activeChat, setActiveChat] = useState(null) // Set default to null
   const [message, setMessage] = useState("")
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
@@ -568,206 +568,194 @@ function ChatPage() {
 
         {/* Main chat area */}
         <div className="chat-main">
-          {/* Mobile top nav for showing back button on mobile */}
-          <div className="chat-mobile-nav">
-            <button className="mobile-back-button" onClick={() => setMobileSidebarOpen(true)}>
-              <Menu size={24} />
-            </button>
-            <div className="mobile-chat-info">
-              <h3>{chats[activeChat]?.name}</h3>
-              {chats[activeChat]?.isGroup ? (
-                <span>{chats[activeChat]?.online} online</span>
-              ) : (
-                <span>{chats[activeChat]?.status || "offline"}</span>
-              )}
+          {activeChat === null ? (
+            <div className="chat-placeholder">
+              <p>Select a chat to start messaging</p>
             </div>
-            <div className="chat-actions">
-              <button className="mobile-menu-button">
-                <Phone size={20} />
-              </button>
-              <button className="mobile-menu-button">
-                <MoreVertical size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Chat header */}
-          <div className="chat-header">
-            <div className="chat-header-info">
-              <div className="chat-header-avatar">{chats[activeChat] && getAvatar(chats[activeChat])}</div>
-              <div className="chat-header-text">
-                <h3>{chats[activeChat]?.name}</h3>
-                {chats[activeChat]?.isGroup ? (
-                  <span>
-                    {chats[activeChat]?.online} online • {chats[activeChat]?.members} members
-                  </span>
-                ) : (
-                  <span>{chats[activeChat]?.status === "online" ? "Online" : "Offline"}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="chat-header-actions">
-              <button className="chat-header-button">
-                <Phone size={20} />
-              </button>
-              <button className="chat-header-button">
-                <Video size={20} />
-              </button>
-              <button className="chat-header-button">
-                <Search size={20} />
-              </button>
-              <button className="chat-header-button">
-                <Info size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Chat messages */}
-          <div className="chat-messages" ref={messageListRef}>
-            <div className="chat-date-divider">
-              <span>Today</span>
-            </div>
-
-            {messages.map((message, index) => {
-              // Check if we should show sender name again (for group conversations)
-              const showSender =
-                index === 0 ||
-                messages[index - 1].sender !== message.sender ||
-                messages[index - 1].isMe !== message.isMe
-
-              return (
-                <div
-                  key={message.id}
-                  className={`chat-message ${message.isMe ? "chat-message-out" : "chat-message-in"} ${
-                    showSender ? "" : "chat-message-continued"
-                  }`}
-                >
-                  {!message.isMe && showSender && (
-                    <div className="chat-message-avatar">{getMessageAvatar(message)}</div>
-                  )}
-                  <div className="chat-message-content">
-                    {!message.isMe && showSender && <p className="chat-message-sender">{message.sender}</p>}
-                    <div className="chat-message-bubble">
-                      <p>{message.text}</p>
-                      <span className="chat-message-time">{message.time}</span>
-                    </div>
+          ) : (
+            <>
+              {/* Chat header */}
+              <div className="chat-header">
+                <div className="chat-header-info">
+                  <div className="chat-header-avatar">{chats[activeChat] && getAvatar(chats[activeChat])}</div>
+                  <div className="chat-header-text">
+                    <h3>{chats[activeChat]?.name}</h3>
+                    {chats[activeChat]?.isGroup ? (
+                      <span>
+                        {chats[activeChat]?.online} online • {chats[activeChat]?.members} members
+                      </span>
+                    ) : (
+                      <span>{chats[activeChat]?.status === "online" ? "Online" : "Offline"}</span>
+                    )}
                   </div>
                 </div>
-              )
-            })}
-            <div ref={messagesEndRef}></div>
-          </div>
 
-          {/* Chat input */}
-          <div className="chat-input-container">
-            <div className="chat-input-actions">
-              <div className="chat-input-buttons">
-                <button
-                  className={`chat-input-button ${showEmojiPicker ? "active" : ""}`}
-                  onClick={() => {
-                    setShowEmojiPicker(!showEmojiPicker)
-                    setShowAttachMenu(false)
-                  }}
-                >
-                  <Smile size={22} />
-                </button>
-                <div className={`emoji-picker-container ${showEmojiPicker ? "show" : ""}`} ref={emojiPickerRef}>
-                  <div className="emoji-picker">
-                    <div className="emoji-picker-header">
-                      <h4>Emojis</h4>
-                      <button onClick={() => setShowEmojiPicker(false)}>
-                        <X size={14} />
-                      </button>
+                <div className="chat-header-actions">
+                  <button className="chat-header-button" data-tooltip="Call">
+                    <Phone size={20} />
+                  </button>
+                  <button className="chat-header-button" data-tooltip="Video">
+                    <Video size={20} />
+                  </button>
+                  <button className="chat-header-button" data-tooltip="Search">
+                    <Search size={20} />
+                  </button>
+                  <button className="chat-header-button" data-tooltip="Info">
+                    <Info size={20} />
+                  </button>
+                  <button className="chat-header-button" onClick={() => setActiveChat(null)} data-tooltip="Close">
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat messages */}
+              <div className="chat-messages" ref={messageListRef}>
+                <div className="chat-date-divider">
+                  <span>Today</span>
+                </div>
+
+                {messages.map((message, index) => {
+                  // Check if we should show sender name again (for group conversations)
+                  const showSender =
+                    index === 0 ||
+                    messages[index - 1].sender !== message.sender ||
+                    messages[index - 1].isMe !== message.isMe
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`chat-message ${message.isMe ? "chat-message-out" : "chat-message-in"} ${
+                        showSender ? "" : "chat-message-continued"
+                      }`}
+                    >
+                      {!message.isMe && showSender && (
+                        <div className="chat-message-avatar">{getMessageAvatar(message)}</div>
+                      )}
+                      <div className="chat-message-content">
+                        {!message.isMe && showSender && <p className="chat-message-sender">{message.sender}</p>}
+                        <div className="chat-message-bubble">
+                          <p>{message.text}</p>
+                          <span className="chat-message-time">{message.time}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="emoji-picker-content">
-                      <div className="emoji-grid">
-                        {[
-                          "😊",
-                          "😂",
-                          "❤️",
-                          "👍",
-                          "🙏",
-                          "🔥",
-                          "✨",
-                          "😎",
-                          "😁",
-                          "🤣",
-                          "😍",
-                          "🥳",
-                          "😇",
-                          "🤔",
-                          "👏",
-                          "🎉",
-                        ].map((emoji) => (
-                          <button
-                            key={emoji}
-                            className="emoji-item"
-                            onClick={() => {
-                              setMessage(message + emoji)
-                              setShowEmojiPicker(false)
-                              inputRef.current?.focus()
-                            }}
-                          >
-                            {emoji}
+                  )
+                })}
+                <div ref={messagesEndRef}></div>
+              </div>
+
+              {/* Chat input */}
+              <div className="chat-input-container">
+                <div className="chat-input-actions">
+                  <div className="chat-input-buttons">
+                    <button
+                      className={`chat-input-button ${showEmojiPicker ? "active" : ""}`}
+                      onClick={() => {
+                        setShowEmojiPicker(!showEmojiPicker)
+                        setShowAttachMenu(false)
+                      }}
+                    >
+                      <Smile size={22} />
+                    </button>
+                    <div className={`emoji-picker-container ${showEmojiPicker ? "show" : ""}`} ref={emojiPickerRef}>
+                      <div className="emoji-picker">
+                        <div className="emoji-picker-header">
+                          <h4>Emojis</h4>
+                          <button onClick={() => setShowEmojiPicker(false)}>
+                            <X size={14} />
                           </button>
-                        ))}
+                        </div>
+                        <div className="emoji-picker-content">
+                          <div className="emoji-grid">
+                            {[
+                              "😊",
+                              "😂",
+                              "❤️",
+                              "👍",
+                              "🙏",
+                              "🔥",
+                              "✨",
+                              "😎",
+                              "😁",
+                              "🤣",
+                              "😍",
+                              "🥳",
+                              "😇",
+                              "🤔",
+                              "👏",
+                              "🎉",
+                            ].map((emoji) => (
+                              <button
+                                key={emoji}
+                                className="emoji-item"
+                                onClick={() => {
+                                  setMessage(message + emoji)
+                                  setShowEmojiPicker(false)
+                                  inputRef.current?.focus()
+                                }}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      className={`chat-input-button ${showAttachMenu ? "active" : ""}`}
+                      onClick={() => {
+                        setShowAttachMenu(!showAttachMenu)
+                        setShowEmojiPicker(false)
+                      }}
+                    >
+                      <Paperclip size={22} />
+                    </button>
+                    <div className={`attach-menu-container ${showAttachMenu ? "show" : ""}`} ref={attachMenuRef}>
+                      <div className="attach-menu">
+                        <button className="attach-menu-item">
+                          <div className="attach-menu-icon image-icon">
+                            <ImageIcon size={20} />
+                          </div>
+                          <span>Image</span>
+                        </button>
+                        <button className="attach-menu-item">
+                          <div className="attach-menu-icon file-icon">
+                            <File size={20} />
+                          </div>
+                          <span>Document</span>
+                        </button>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  className={`chat-input-button ${showAttachMenu ? "active" : ""}`}
-                  onClick={() => {
-                    setShowAttachMenu(!showAttachMenu)
-                    setShowEmojiPicker(false)
-                  }}
-                >
-                  <Paperclip size={22} />
-                </button>
-                <div className={`attach-menu-container ${showAttachMenu ? "show" : ""}`} ref={attachMenuRef}>
-                  <div className="attach-menu">
-                    <button className="attach-menu-item">
-                      <div className="attach-menu-icon image-icon">
-                        <ImageIcon size={20} />
-                      </div>
-                      <span>Image</span>
-                    </button>
-                    <button className="attach-menu-item">
-                      <div className="attach-menu-icon file-icon">
-                        <File size={20} />
-                      </div>
-                      <span>Document</span>
-                    </button>
-                  </div>
+                  <form className="chat-input-form" onSubmit={handleSendMessage}>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Type a message..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onClick={() => {
+                        setShowEmojiPicker(false);
+                        setShowAttachMenu(false);
+                      }}
+                    />
+                    {message.trim() === "" ? (
+                      <button type="button" className="chat-input-mic">
+                        <Mic size={20} />
+                      </button>
+                    ) : (
+                      <button type="submit" className="chat-input-send">
+                        <Send size={20} />
+                      </button>
+                    )}
+                  </form>
                 </div>
               </div>
-
-              <form className="chat-input-form" onSubmit={handleSendMessage}>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="Type a message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onClick={() => {
-                    setShowEmojiPicker(false);
-                    setShowAttachMenu(false);
-                  }}
-                />
-                {message.trim() === "" ? (
-                  <button type="button" className="chat-input-mic">
-                    <Mic size={20} />
-                  </button>
-                ) : (
-                  <button type="submit" className="chat-input-send">
-                    <Send size={20} />
-                  </button>
-                )}
-              </form>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

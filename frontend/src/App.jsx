@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from "react-router-dom"
 import Header from "./components/Header"
 import HeroSection from "./components/HeroSection"
 import FeaturesSection from "./components/FeaturesSection"
@@ -97,39 +97,44 @@ function AppContent() {
           </>
         } />
         <Route
-          path="*"
+          path="/login"
+          element={
+            isLoggedIn ? <Navigate to="/" replace /> : <LoginPage />
+          }
+        />
+        <Route
+          path="/"
           element={
             <>
               <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <>
-                      <HeroSection
-                        onGetStartedClick={() => {
-                          if (isLoggedIn) {
-                            navigate("/chat")
-                          } else {
-                            navigate("/login")
-                          }
-                        }}
-                        isLoggedIn={isLoggedIn}
-                      />
-                      <FeaturesSection data-aos="fade-up" />
-                      <AboutSection data-aos="fade-up" />
-                      <CTASection data-aos="zoom-in" />
-                    </>
+              <HeroSection
+                onGetStartedClick={() => {
+                  if (isLoggedIn) {
+                    navigate("/chat")
+                  } else {
+                    navigate("/login")
                   }
-                />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/faq" element={<FAQPage />} />
-              </Routes>
-              <Footer />
+                }}
+                isLoggedIn={isLoggedIn}
+              />
+              {isLoggedIn ? (
+                <>
+                  <AboutSection data-aos="fade-up" />
+                  <Footer />
+                </>
+              ) : (
+                <>
+                  <FeaturesSection data-aos="fade-up" />
+                  <AboutSection data-aos="fade-up" />
+                  <CTASection data-aos="zoom-in" />
+                  <Footer />
+                </>
+              )}
             </>
           }
         />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/faq" element={<FAQPage />} />
       </Routes>
     </div>
   )
