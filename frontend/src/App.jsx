@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
 import Header from "./components/Header"
 import HeroSection from "./components/HeroSection"
 import FeaturesSection from "./components/FeaturesSection"
@@ -17,8 +17,11 @@ import "./styles/App.css"
 import AOS from "aos"
 import "aos/dist/aos.css"
 
-function App() {
+// Wrapper component that has access to router context
+function AppContent() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
+  const isLoggedIn = !!localStorage.getItem("authToken") // Check if user is logged in
   
   // Initialize AOS (Animate on Scroll) and scroll handling
   useEffect(() => {
@@ -83,30 +86,60 @@ function App() {
   }, [menuOpen])
 
   return (
+    <div className="app-container">
+      <ScrollToTop />
+      <Routes>
+        <Route path="/chat" element={
+          <>
+            <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+            <ChatPage />
+            {/* Footer removed from the Chat page */}
+          </>
+        } />
+        <Route
+          path="*"
+          element={
+            <>
+              <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <>
+                      <HeroSection
+                        onGetStartedClick={() => {
+                          if (isLoggedIn) {
+                            navigate("/chat")
+                          } else {
+                            navigate("/login")
+                          }
+                        }}
+                        isLoggedIn={isLoggedIn}
+                      />
+                      <FeaturesSection data-aos="fade-up" />
+                      <AboutSection data-aos="fade-up" />
+                      <CTASection data-aos="zoom-in" />
+                    </>
+                  }
+                />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/faq" element={<FAQPage />} />
+              </Routes>
+              <Footer />
+            </>
+          }
+        />
+      </Routes>
+    </div>
+  )
+}
+
+// Main App component that sets up the Router
+function App() {
+  return (
     <Router>
-      <div className="app-container">
-        <ScrollToTop />
-        <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <>
-                <HeroSection />
-                <FeaturesSection data-aos="fade-up" />
-                <AboutSection data-aos="fade-up" />
-                <CTASection data-aos="zoom-in" />
-              </>
-            }
-          />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="*" element={<h1>404 Not Found</h1>} />
-        </Routes>
-        <Footer />
-      </div>
+      <AppContent />
     </Router>
   )
 }

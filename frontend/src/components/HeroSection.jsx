@@ -4,7 +4,7 @@ import ChatHeroDemo from "./ChatHeroDemo"
 import { ArrowRight } from "lucide-react"
 import "../styles/HeroSection.css"
 
-function HeroSection() {
+function HeroSection({ onGetStartedClick, isLoggedIn }) {
   return (
     <section className="hero-section">
       <div className="hero-background">
@@ -26,8 +26,12 @@ function HeroSection() {
             designed exclusively for LPU students and faculty.
           </p>
           <div className="hero-buttons">
-            <Button size="large" className="primary-button">
-              Get Started <ArrowRight className="button-icon" />
+            <Button 
+              size="large" 
+              className="primary-button"
+              onClick={onGetStartedClick}
+            >
+              {isLoggedIn ? "Chat Now" : "Get Started"} <ArrowRight className="button-icon" />
             </Button>
             <Button size="large" variant="outline" className="outline-button">
               Learn More

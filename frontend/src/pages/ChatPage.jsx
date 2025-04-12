@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   Search,
   Menu,
@@ -13,26 +14,44 @@ import {
   ImageIcon,
   File,
   Mic,
+  X,
   MoreVertical,
   Users,
-  Bell,
-  Settings,
-  LogOut,
+  Plus,
 } from "lucide-react"
 import "../styles/ChatPage.css"
 
 function ChatPage() {
+  const navigate = useNavigate()
   const [activeChat, setActiveChat] = useState(0)
   const [message, setMessage] = useState("")
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true)
+  const [chatFilter, setChatFilter] = useState("all")
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const attachMenuRef = useRef(null)
-  const userMenuRef = useRef(null)
+  const messageListRef = useRef(null)
+
+  // Add class to body when chat page mounts and remove when unmounts
+  useEffect(() => {
+    document.body.classList.add('chat-page-active');
+    
+    return () => {
+      document.body.classList.remove('chat-page-active');
+    };
+  }, []);
+
+  // Check for authentication
+  useEffect(() => {
+    const authToken = localStorage.getItem("authToken")
+    if (!authToken) {
+      navigate("/login")
+    }
+  }, [navigate])
 
   // Sample data for chats
   const chats = [
@@ -46,6 +65,7 @@ function ChatPage() {
       lastMessage: "Dr. Kumar: Don't forget to submit your assignments by Friday!",
       time: "10:45 AM",
       unread: 3,
+      type: "academic",
     },
     {
       id: 1,
@@ -56,6 +76,7 @@ function ChatPage() {
       lastMessage: "I'll send you the lecture notes soon",
       time: "9:30 AM",
       unread: 0,
+      type: "personal",
     },
     {
       id: 2,
@@ -67,6 +88,7 @@ function ChatPage() {
       lastMessage: "Meeting scheduled for tomorrow at 5 PM in Lab 3",
       time: "Yesterday",
       unread: 2,
+      type: "club",
     },
     {
       id: 3,
@@ -77,6 +99,7 @@ function ChatPage() {
       lastMessage: "Thanks for helping with the project",
       time: "Yesterday",
       unread: 0,
+      type: "personal",
     },
     {
       id: 4,
@@ -88,16 +111,7 @@ function ChatPage() {
       lastMessage: "Cultural fest registrations are now open!",
       time: "2 days ago",
       unread: 0,
-    },
-    {
-      id: 5,
-      name: "Priya Sharma",
-      avatar: "/placeholder.svg?height=50&width=50",
-      isGroup: false,
-      status: "online",
-      lastMessage: "Are you coming to the workshop?",
-      time: "2 days ago",
-      unread: 0,
+      type: "announcement",
     },
   ]
 
@@ -183,13 +197,57 @@ function ChatPage() {
     },
   ]
 
-  // Filter chats based on search query
-  const filteredChats = chats.filter((chat) => chat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filter chats based on search query and chat filter
+  const filteredChats = chats.filter((chat) => {
+    const matchesSearch = chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesFilter = chatFilter === "all" || chat.type === chatFilter
+    return matchesSearch && matchesFilter
+  })
 
-  // Scroll to bottom of messages when messages change or active chat changes
+  // Handle scroll behavior in the message list
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, activeChat])
+    if (shouldScrollToBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [shouldScrollToBottom, messages])
+
+  // Track scroll position to determine if auto-scrolling should happen
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!messageListRef.current) return
+
+      const { scrollTop, scrollHeight, clientHeight } = messageListRef.current
+      // If user is at or very near bottom (within 100px), enable auto-scroll
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+
+      setShouldScrollToBottom(isNearBottom)
+    }
+
+    const messageList = messageListRef.current
+    if (messageList) {
+      messageList.addEventListener("scroll", handleScroll)
+      return () => messageList.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
+  // Scroll to bottom when entering chat page initially
+  useEffect(() => {
+    // Ensure we scroll to the bottom of the chat messages area, not the whole page
+    if (messageListRef.current) {
+      setTimeout(() => {
+        messageListRef.current.scrollTop = messageListRef.current.scrollHeight
+      }, 100) // Small delay to ensure content is rendered
+    }
+  }, [])
+
+  // Reset scroll when changing chats
+  useEffect(() => {
+    if (messageListRef.current) {
+      // Immediately scroll to bottom when changing chats
+      messageListRef.current.scrollTop = messageListRef.current.scrollHeight
+      setShouldScrollToBottom(true)
+    }
+  }, [activeChat])
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -199,9 +257,6 @@ function ChatPage() {
       }
       if (attachMenuRef.current && !attachMenuRef.current.contains(event.target)) {
         setShowAttachMenu(false)
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setUserMenuOpen(false)
       }
     }
 
@@ -217,246 +272,446 @@ function ChatPage() {
     if (message.trim() === "") return
 
     // In a real app, you would send this message to your backend
-    console.log("Sending message:", message)
+    const newMessage = {
+      id: messages.length + 1,
+      sender: "Me",
+      text: message,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isMe: true,
+    }
 
-    // Clear the input field
+    // For demo purposes, we're just adding to the local state
+    // messages.push(newMessage)
+    // setMessages([...messages])
+
     setMessage("")
+    setShouldScrollToBottom(true) // Ensure we scroll to bottom after sending
   }
 
-  // Handle emoji selection
-  const handleEmojiSelect = (emoji) => {
-    setMessage((prev) => prev + emoji)
-    setShowEmojiPicker(false)
+  // Generate avatar from name
+  const generateColorFromName = (name) => {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    const h = hash % 360
+    return `hsl(${h}, 70%, 50%)` // Generate HSL color with consistent saturation and lightness
   }
 
-  // Sample emojis for the picker
-  const emojis = ["😊", "👍", "❤️", "🎉", "🔥", "😂", "🙏", "👏", "🤔", "😎", "🚀", "✨", "💯", "🌟", "👋"]
+  // Function to get user or group avatar
+  const getAvatar = (chat) => {
+    // Placeholder for avatar images - in a real app, you would use the actual avatar URLs
+    if (chat.avatar) {
+      return (
+        <div className="chat-avatar-wrapper">
+          <img
+            src={
+              chat.avatar.startsWith("/")
+                ? chat.avatar
+                : `http://localhost:5000${chat.avatar}`
+            }
+            alt={chat.name}
+            className="chat-avatar-img"
+            onError={(e) => {
+              // Safely check if the parent has the text avatar as a child before hiding the image
+              e.target.style.display = "none";
+              // Create and add the text avatar if it doesn't exist
+              const parent = e.target.parentNode;
+              if (parent) {
+                // Check if text avatar already exists
+                const existingTextAvatar = parent.querySelector(".chat-avatar-text");
+                if (!existingTextAvatar) {
+                  // Create text avatar element
+                  const initials = chat.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .substring(0, 2);
+                  
+                  const textAvatar = document.createElement("div");
+                  textAvatar.className = "chat-avatar-text";
+                  textAvatar.style.backgroundColor = generateColorFromName(chat.name);
+                  textAvatar.textContent = initials;
+                  
+                  // Append to parent
+                  parent.appendChild(textAvatar);
+                }
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    // If no avatar or image fails, use first letter(s) of name
+    const initials = chat.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2);
+
+    return (
+      <div className="chat-avatar-text" style={{ backgroundColor: generateColorFromName(chat.name) }}>
+        {initials}
+      </div>
+    );
+  };
+
+  // Get avatar for message
+  const getMessageAvatar = (message) => {
+    if (message.avatar) {
+      return (
+        <div className="chat-avatar-wrapper">
+          <img
+            src={message.avatar || "/placeholder.svg"}
+            alt={message.sender}
+            onError={(e) => {
+              // Safely check if the parent has the text avatar as a child before hiding the image
+              e.target.style.display = "none";
+              // Create and add the text avatar if it doesn't exist
+              const parent = e.target.parentNode;
+              if (parent) {
+                // Check if text avatar already exists
+                const existingTextAvatar = parent.querySelector(".chat-message-avatar-placeholder");
+                if (!existingTextAvatar) {
+                  // Create text avatar element
+                  const textAvatar = document.createElement("div");
+                  textAvatar.className = "chat-message-avatar-placeholder";
+                  textAvatar.style.backgroundColor = generateColorFromName(message.sender);
+                  textAvatar.textContent = message.sender.charAt(0);
+                  
+                  // Append to parent
+                  parent.appendChild(textAvatar);
+                }
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="chat-message-avatar-placeholder"
+        style={{ backgroundColor: generateColorFromName(message.sender) }}
+      >
+        {message.sender.charAt(0)}
+      </div>
+    );
+  };
 
   return (
-    <div className="lpuchat-page">
-      {/* Mobile sidebar backdrop */}
-      {mobileSidebarOpen && (
-        <div className="lpuchat-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)}></div>
-      )}
+    <div className="chat-page-wrapper">
+      <div className="chat-page">
+        {/* Mobile sidebar backdrop */}
+        {mobileSidebarOpen && <div className="chat-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)}></div>}
 
-      {/* Sidebar */}
-      <div className={`lpuchat-sidebar ${mobileSidebarOpen ? "lpuchat-sidebar-open" : ""}`}>
-        {/* Sidebar header */}
-        <div className="lpuchat-sidebar-header">
-          <div className="lpuchat-user-profile" onClick={() => setUserMenuOpen(!userMenuOpen)}>
-            <div className="lpuchat-user-avatar">
-              <span>J</span>
+        {/* Sidebar with chat list */}
+        <div className={`chat-sidebar ${mobileSidebarOpen ? "chat-sidebar-open" : ""}`}>
+          {/* Sidebar header */}
+          <div className="chat-sidebar-header">
+            <div className="chat-title">
+              <h2>Chats</h2>
+              <span className="chat-count">{chats.length}</span>
             </div>
-            <div className="lpuchat-user-info">
-              <h3>John Doe</h3>
-              <p>Online</p>
+            <div className="chat-actions">
+              <button className="chat-action-button">
+                <Plus size={20} />
+              </button>
+              <button className="chat-action-button">
+                <MoreVertical size={20} />
+              </button>
             </div>
-            <MoreVertical size={20} className="lpuchat-more-icon" />
           </div>
 
-          {/* User menu */}
-          {userMenuOpen && (
-            <div className="lpuchat-user-menu" ref={userMenuRef}>
-              <div className="lpuchat-menu-item">
-                <Users size={18} />
-                <span>Profile</span>
-              </div>
-              <div className="lpuchat-menu-item">
-                <Bell size={18} />
-                <span>Notifications</span>
-              </div>
-              <div className="lpuchat-menu-item">
-                <Settings size={18} />
-                <span>Settings</span>
-              </div>
-              <div className="lpuchat-menu-divider"></div>
-              <div className="lpuchat-menu-item lpuchat-logout">
-                <LogOut size={18} />
-                <span>Logout</span>
-              </div>
-            </div>
-          )}
-
           {/* Search bar */}
-          <div className="lpuchat-search-container">
-            <Search size={18} className="lpuchat-search-icon" />
+          <div className="chat-search">
+            <Search size={18} className="chat-search-icon" />
             <input
               type="text"
               placeholder="Search conversations..."
-              className="lpuchat-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button className="chat-search-clear" onClick={() => setSearchQuery("")}>
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Chat filters */}
+          <div className="chat-filters">
+            <button
+              className={`chat-filter-button ${chatFilter === "all" ? "active" : ""}`}
+              onClick={() => setChatFilter("all")}
+            >
+              All
+            </button>
+            <button
+              className={`chat-filter-button ${chatFilter === "academic" ? "active" : ""}`}
+              onClick={() => setChatFilter("academic")}
+            >
+              Academic
+            </button>
+            <button
+              className={`chat-filter-button ${chatFilter === "personal" ? "active" : ""}`}
+              onClick={() => setChatFilter("personal")}
+            >
+              Personal
+            </button>
+            <button
+              className={`chat-filter-button ${chatFilter === "club" ? "active" : ""}`}
+              onClick={() => setChatFilter("club")}
+            >
+              Clubs
+            </button>
+          </div>
+
+          {/* Chat list */}
+          <div className="chat-list">
+            {filteredChats.length > 0 ? (
+              filteredChats.map((chat) => (
+                <div
+                  key={chat.id}
+                  className={`chat-list-item ${activeChat === chat.id ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveChat(chat.id)
+                    setMobileSidebarOpen(false)
+                  }}
+                >
+                  <div className="chat-list-avatar">
+                    {getAvatar(chat)}
+                    {!chat.isGroup && chat.status === "online" && <div className="chat-status-dot"></div>}
+                    {chat.isGroup && (
+                      <div className="chat-group-indicator">
+                        <Users size={10} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="chat-list-content">
+                    <div className="chat-list-header">
+                      <h4>{chat.name}</h4>
+                      <span className="chat-time">{chat.time}</span>
+                    </div>
+                    <div className="chat-list-message-preview">
+                      <p>{chat.lastMessage}</p>
+                      {chat.unread > 0 && <span className="chat-unread">{chat.unread}</span>}
+                    </div>
+                    {chat.isGroup && (
+                      <div className="chat-list-meta">
+                        <span>{chat.online} online</span>
+                        <span className="chat-list-dot">•</span>
+                        <span>{chat.members} members</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="chat-no-results">
+                <div className="chat-no-results-icon">
+                  <Search size={32} />
+                </div>
+                <p>No conversations found</p>
+                <button
+                  className="chat-reset-search"
+                  onClick={() => {
+                    setSearchQuery("")
+                    setChatFilter("all")
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Chat list */}
-        <div className="lpuchat-chat-list">
-          {filteredChats.length > 0 ? (
-            filteredChats.map((chat) => (
-              <div
-                key={chat.id}
-                className={`lpuchat-chat-item ${activeChat === chat.id ? "lpuchat-active" : ""}`}
-                onClick={() => {
-                  setActiveChat(chat.id)
-                  setMobileSidebarOpen(false)
-                }}
-              >
-                <div className="lpuchat-chat-avatar">
-                  <img src={chat.avatar || "/placeholder.svg"} alt={chat.name} />
-                  {chat.isGroup ? (
-                    <div className="lpuchat-group-indicator">
-                      <Users size={12} />
-                    </div>
-                  ) : (
-                    chat.status === "online" && <div className="lpuchat-status-indicator"></div>
-                  )}
-                </div>
-                <div className="lpuchat-chat-details">
-                  <div className="lpuchat-chat-header">
-                    <h4>{chat.name}</h4>
-                    <span className="lpuchat-chat-time">{chat.time}</span>
-                  </div>
-                  <div className="lpuchat-chat-message">
-                    <p>{chat.lastMessage}</p>
-                    {chat.unread > 0 && <span className="lpuchat-unread-badge">{chat.unread}</span>}
-                  </div>
-                  {chat.isGroup && (
-                    <div className="lpuchat-group-info">
-                      <span>{chat.online} online</span>
-                      <span className="lpuchat-dot">•</span>
-                      <span>{chat.members} members</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="lpuchat-no-results">
-              <p>No conversations found</p>
-              <button onClick={() => setSearchQuery("")}>Clear search</button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main chat area */}
-      <div className="lpuchat-main">
-        {/* Chat header */}
-        <div className="lpuchat-chat-header">
-          <div className="lpuchat-header-left">
-            <button className="lpuchat-menu-button" onClick={() => setMobileSidebarOpen(true)}>
+        {/* Main chat area */}
+        <div className="chat-main">
+          {/* Mobile top nav for showing back button on mobile */}
+          <div className="chat-mobile-nav">
+            <button className="mobile-back-button" onClick={() => setMobileSidebarOpen(true)}>
               <Menu size={24} />
             </button>
-            <div className="lpuchat-chat-avatar">
-              <img src={chats[activeChat].avatar || "/placeholder.svg"} alt={chats[activeChat].name} />
-              {!chats[activeChat].isGroup && chats[activeChat].status === "online" && (
-                <div className="lpuchat-status-indicator"></div>
-              )}
-            </div>
-            <div className="lpuchat-chat-info">
-              <h3>{chats[activeChat].name}</h3>
-              {chats[activeChat].isGroup ? (
-                <p>
-                  {chats[activeChat].online} online • {chats[activeChat].members} members
-                </p>
+            <div className="mobile-chat-info">
+              <h3>{chats[activeChat]?.name}</h3>
+              {chats[activeChat]?.isGroup ? (
+                <span>{chats[activeChat]?.online} online</span>
               ) : (
-                <p>{chats[activeChat].status === "online" ? "Online" : "Offline"}</p>
+                <span>{chats[activeChat]?.status || "offline"}</span>
               )}
             </div>
-          </div>
-          <div className="lpuchat-header-actions">
-            <button className="lpuchat-action-button">
-              <Phone size={20} />
-            </button>
-            <button className="lpuchat-action-button">
-              <Video size={20} />
-            </button>
-            <button className="lpuchat-action-button">
-              <Info size={20} />
+            <button className="mobile-menu-button">
+              <MoreVertical size={24} />
             </button>
           </div>
-        </div>
 
-        {/* Messages area */}
-        <div className="lpuchat-messages">
-          <div className="lpuchat-date-divider">
-            <span>Today</span>
-          </div>
-
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`lpuchat-message ${msg.isMe ? "lpuchat-message-sent" : "lpuchat-message-received"}`}
-            >
-              {!msg.isMe && (
-                <div className="lpuchat-message-avatar">
-                  <img src={msg.avatar || "/placeholder.svg"} alt={msg.sender} />
-                </div>
-              )}
-              <div className="lpuchat-message-content">
-                {!msg.isMe && <div className="lpuchat-message-sender">{msg.sender}</div>}
-                <div className="lpuchat-message-bubble">
-                  <p>{msg.text}</p>
-                  <span className="lpuchat-message-time">{msg.time}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Message input area */}
-        <div className="lpuchat-input-area">
-          <div className="lpuchat-input-container">
-            <div className="lpuchat-input-actions">
-              <div className="lpuchat-emoji-container" ref={emojiPickerRef}>
-                <button className="lpuchat-action-icon" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-                  <Smile size={22} />
-                </button>
-                {showEmojiPicker && (
-                  <div className="lpuchat-emoji-picker">
-                    {emojis.map((emoji, index) => (
-                      <button key={index} className="lpuchat-emoji" onClick={() => handleEmojiSelect(emoji)}>
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
+          {/* Chat header */}
+          <div className="chat-header">
+            <div className="chat-header-info">
+              <div className="chat-header-avatar">{chats[activeChat] && getAvatar(chats[activeChat])}</div>
+              <div className="chat-header-text">
+                <h3>{chats[activeChat]?.name}</h3>
+                {chats[activeChat]?.isGroup ? (
+                  <span>
+                    {chats[activeChat]?.online} online • {chats[activeChat]?.members} members
+                  </span>
+                ) : (
+                  <span>{chats[activeChat]?.status === "online" ? "Online" : "Offline"}</span>
                 )}
               </div>
-              <div className="lpuchat-attach-container" ref={attachMenuRef}>
-                <button className="lpuchat-action-icon" onClick={() => setShowAttachMenu(!showAttachMenu)}>
+            </div>
+
+            <div className="chat-header-actions">
+              <button className="chat-header-button">
+                <Phone size={20} />
+              </button>
+              <button className="chat-header-button">
+                <Video size={20} />
+              </button>
+              <button className="chat-header-button">
+                <Search size={20} />
+              </button>
+              <button className="chat-header-button">
+                <Info size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Chat messages */}
+          <div className="chat-messages" ref={messageListRef}>
+            <div className="chat-date-divider">
+              <span>Today</span>
+            </div>
+
+            {messages.map((message, index) => {
+              // Check if we should show sender name again (for group conversations)
+              const showSender =
+                index === 0 ||
+                messages[index - 1].sender !== message.sender ||
+                messages[index - 1].isMe !== message.isMe
+
+              return (
+                <div
+                  key={message.id}
+                  className={`chat-message ${message.isMe ? "chat-message-out" : "chat-message-in"} ${
+                    showSender ? "" : "chat-message-continued"
+                  }`}
+                >
+                  {!message.isMe && showSender && (
+                    <div className="chat-message-avatar">{getMessageAvatar(message)}</div>
+                  )}
+                  <div className="chat-message-content">
+                    {!message.isMe && showSender && <p className="chat-message-sender">{message.sender}</p>}
+                    <div className="chat-message-bubble">
+                      <p>{message.text}</p>
+                      <span className="chat-message-time">{message.time}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div ref={messagesEndRef}></div>
+          </div>
+
+          {/* Chat input */}
+          <div className="chat-input-container">
+            <div className="chat-input-actions">
+              <div className="chat-input-buttons">
+                <button
+                  className={`chat-input-button ${showEmojiPicker ? "active" : ""}`}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <Smile size={22} />
+                </button>
+                <div className={`emoji-picker-container ${showEmojiPicker ? "show" : ""}`} ref={emojiPickerRef}>
+                  <div className="emoji-picker">
+                    <div className="emoji-picker-header">
+                      <h4>Emojis</h4>
+                      <button onClick={() => setShowEmojiPicker(false)}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="emoji-picker-content">
+                      <div className="emoji-grid">
+                        {[
+                          "😊",
+                          "😂",
+                          "❤️",
+                          "👍",
+                          "🙏",
+                          "🔥",
+                          "✨",
+                          "😎",
+                          "😁",
+                          "🤣",
+                          "😍",
+                          "🥳",
+                          "😇",
+                          "🤔",
+                          "👏",
+                          "🎉",
+                        ].map((emoji) => (
+                          <button
+                            key={emoji}
+                            className="emoji-item"
+                            onClick={() => {
+                              setMessage(message + emoji)
+                              setShowEmojiPicker(false)
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  className={`chat-input-button ${showAttachMenu ? "active" : ""}`}
+                  onClick={() => setShowAttachMenu(!showAttachMenu)}
+                >
                   <Paperclip size={22} />
                 </button>
-                {showAttachMenu && (
-                  <div className="lpuchat-attach-menu">
-                    <button className="lpuchat-attach-option">
-                      <ImageIcon size={20} />
+                <div className={`attach-menu-container ${showAttachMenu ? "show" : ""}`} ref={attachMenuRef}>
+                  <div className="attach-menu">
+                    <button className="attach-menu-item">
+                      <div className="attach-menu-icon image-icon">
+                        <ImageIcon size={20} />
+                      </div>
                       <span>Image</span>
                     </button>
-                    <button className="lpuchat-attach-option">
-                      <File size={20} />
+                    <button className="attach-menu-item">
+                      <div className="attach-menu-icon file-icon">
+                        <File size={20} />
+                      </div>
                       <span>Document</span>
                     </button>
                   </div>
-                )}
+                </div>
               </div>
+
+              <form className="chat-input-form" onSubmit={handleSendMessage}>
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+                {message.trim() === "" ? (
+                  <button type="button" className="chat-input-mic">
+                    <Mic size={20} />
+                  </button>
+                ) : (
+                  <button type="submit" className="chat-input-send">
+                    <Send size={20} />
+                  </button>
+                )}
+              </form>
             </div>
-            <form onSubmit={handleSendMessage} className="lpuchat-message-form">
-              <input
-                type="text"
-                placeholder="Type a message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="lpuchat-message-input"
-              />
-              <button type="button" className="lpuchat-action-icon lpuchat-mic-icon">
-                <Mic size={22} />
-              </button>
-              <button type="submit" className="lpuchat-send-button" disabled={message.trim() === ""}>
-                <Send size={20} />
-              </button>
-            </form>
           </div>
         </div>
       </div>
