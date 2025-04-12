@@ -953,18 +953,39 @@
 }
 
 @media (max-width: 768px) {
+  .chat-page-wrapper {
+    overflow: hidden;
+  }
+
+  .chat-page {
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    margin-top: 0;
+    padding-top: var(--header-height);
+  }
+
   .chat-mobile-nav {
     display: flex;
+    position: fixed;
+    top: var(--header-height);
   }
 
   .chat-sidebar {
-    position: absolute;
-    top: 0;
+    position: fixed;
+    top: var(--header-height);
     left: 0;
-    height: 100%;
+    height: calc(100vh - var(--header-height));
+    width: 80%;
+    max-width: 350px;
     transform: translateX(-100%);
-    z-index: 20;
+    z-index: 950;
     box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease-in-out;
   }
 
   .chat-sidebar-open {
@@ -972,11 +993,24 @@
   }
 
   .chat-main {
-    padding-top: 3.5rem; /* Space for mobile nav */
+    padding-top: 4rem; /* Space for mobile nav */
+    width: 100%;
   }
 
   .chat-header {
     display: none;
+  }
+  
+  .chat-messages {
+    padding: 1rem;
+  }
+  
+  .chat-message-bubble {
+    padding: 0.625rem 0.875rem;
+  }
+  
+  .chat-message-bubble p {
+    font-size: 0.9rem;
   }
 }
 
@@ -986,8 +1020,81 @@
   }
 
   .chat-message {
-    max-width: 85%;
+    max-width: 90%;
   }
+  
+  .emoji-picker {
+    width: 220px;
+  }
+  
+  .emoji-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  
+  .chat-input-form input {
+    padding: 0.75rem 2.75rem 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .attach-menu {
+    transform: translateX(-50%);
+    left: 50%;
+  }
+  
+  .attach-menu-container {
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+  }
+  
+  .attach-menu-container.show {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (max-height: 600px) {
+  .emoji-picker {
+    max-height: 200px;
+  }
+  
+  .chat-input-container {
+    min-height: 3.75rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
+/* Fix for iOS safari viewport height issue */
+@supports (-webkit-touch-callout: none) {
+  body.chat-page-active,
+  .chat-page-wrapper,
+  .chat-sidebar {
+    height: -webkit-fill-available;
+  }
+  
+  @media (max-width: 768px) {
+    .chat-page {
+      height: -webkit-fill-available;
+    }
+  }
+}
+
+/* Scrollbar styling for chat areas */
+.chat-messages::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar,
+.emoji-picker::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-track,
+.chat-list::-webkit-scrollbar-track,
+.emoji-picker::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.chat-messages::-webkit-scrollbar-thumb,
+.chat-list::-webkit-scrollbar-thumb,
+.emoji-picker::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 /* Avatar wrapper */

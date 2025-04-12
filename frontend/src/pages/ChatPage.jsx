@@ -35,13 +35,19 @@ function ChatPage() {
   const emojiPickerRef = useRef(null)
   const attachMenuRef = useRef(null)
   const messageListRef = useRef(null)
+  const inputRef = useRef(null)
 
   // Add class to body when chat page mounts and remove when unmounts
   useEffect(() => {
     document.body.classList.add('chat-page-active');
     
+    // Prevent body scrolling on mobile
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    
     return () => {
       document.body.classList.remove('chat-page-active');
+      document.body.style.overflow = originalStyle;
     };
   }, []);
 
@@ -52,6 +58,24 @@ function ChatPage() {
       navigate("/login")
     }
   }, [navigate])
+
+  // Close emoji picker and attach menu when changing active chat
+  useEffect(() => {
+    setShowEmojiPicker(false);
+    setShowAttachMenu(false);
+  }, [activeChat]);
+
+  // Handle window resize to close sidebar on larger screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768 && mobileSidebarOpen) {
+        setMobileSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileSidebarOpen]);
 
   // Sample data for chats
   const chats = [
@@ -252,19 +276,21 @@ function ChatPage() {
   // Close emoji picker when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-        setShowEmojiPicker(false)
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target) && 
+          !event.target.closest('button')?.classList.contains('chat-input-button')) {
+        setShowEmojiPicker(false);
       }
-      if (attachMenuRef.current && !attachMenuRef.current.contains(event.target)) {
-        setShowAttachMenu(false)
+      if (attachMenuRef.current && !attachMenuRef.current.contains(event.target) && 
+          !event.target.closest('button')?.classList.contains('chat-input-button')) {
+        setShowAttachMenu(false);
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [])
+  }, []);
 
   // Handle sending a message
   const handleSendMessage = (e) => {
@@ -286,6 +312,11 @@ function ChatPage() {
 
     setMessage("")
     setShouldScrollToBottom(true) // Ensure we scroll to bottom after sending
+    
+    // Focus input field after sending
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   }
 
   // Generate avatar from name
@@ -400,11 +431,18 @@ function ChatPage() {
     );
   };
 
+  // Handle backdrop click to close sidebar
+  const handleBackdropClick = () => {
+    setMobileSidebarOpen(false);
+    setShowEmojiPicker(false);
+    setShowAttachMenu(false);
+  };
+
   return (
     <div className="chat-page-wrapper">
       <div className="chat-page">
         {/* Mobile sidebar backdrop */}
-        {mobileSidebarOpen && <div className="chat-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)}></div>}
+        {mobileSidebarOpen && <div className="chat-sidebar-backdrop" onClick={handleBackdropClick}></div>}
 
         {/* Sidebar with chat list */}
         <div className={`chat-sidebar ${mobileSidebarOpen ? "chat-sidebar-open" : ""}`}>
@@ -543,9 +581,14 @@ function ChatPage() {
                 <span>{chats[activeChat]?.status || "offline"}</span>
               )}
             </div>
-            <button className="mobile-menu-button">
-              <MoreVertical size={24} />
-            </button>
+            <div className="chat-actions">
+              <button className="mobile-menu-button">
+                <Phone size={20} />
+              </button>
+              <button className="mobile-menu-button">
+                <MoreVertical size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Chat header */}
@@ -622,7 +665,10 @@ function ChatPage() {
               <div className="chat-input-buttons">
                 <button
                   className={`chat-input-button ${showEmojiPicker ? "active" : ""}`}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => {
+                    setShowEmojiPicker(!showEmojiPicker)
+                    setShowAttachMenu(false)
+                  }}
                 >
                   <Smile size={22} />
                 </button>
@@ -660,6 +706,7 @@ function ChatPage() {
                             onClick={() => {
                               setMessage(message + emoji)
                               setShowEmojiPicker(false)
+                              inputRef.current?.focus()
                             }}
                           >
                             {emoji}
@@ -672,7 +719,10 @@ function ChatPage() {
 
                 <button
                   className={`chat-input-button ${showAttachMenu ? "active" : ""}`}
-                  onClick={() => setShowAttachMenu(!showAttachMenu)}
+                  onClick={() => {
+                    setShowAttachMenu(!showAttachMenu)
+                    setShowEmojiPicker(false)
+                  }}
                 >
                   <Paperclip size={22} />
                 </button>
@@ -696,10 +746,15 @@ function ChatPage() {
 
               <form className="chat-input-form" onSubmit={handleSendMessage}>
                 <input
+                  ref={inputRef}
                   type="text"
                   placeholder="Type a message..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  onClick={() => {
+                    setShowEmojiPicker(false);
+                    setShowAttachMenu(false);
+                  }}
                 />
                 {message.trim() === "" ? (
                   <button type="button" className="chat-input-mic">
