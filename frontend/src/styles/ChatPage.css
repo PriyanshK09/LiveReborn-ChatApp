@@ -103,6 +103,22 @@
   transition: transform 0.3s ease-in-out;
 }
 
+/* Removing default transform that was hiding the sidebar in PC view */
+/* Only apply slideOut animation on mobile */
+@media (max-width: 768px) {
+  .chat-sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .chat-sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+.chat-sidebar-close {
+  animation: slideOut 0.3s ease-in-out;
+}
+
 .chat-sidebar-header {
   padding: 1.25rem;
   border-bottom: 1px solid var(--border-color);
@@ -155,6 +171,28 @@
 .chat-action-button:hover {
   background-color: var(--bg-light);
   color: var(--primary-color);
+}
+
+/* Notification badge */
+.notification-button {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border: 2px solid white;
 }
 
 /* Search section */
@@ -984,6 +1022,40 @@
   color: var(--text-color);
 }
 
+/* Loading indicators */
+.chat-loading,
+.chat-loading-messages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  color: var(--text-light);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.chat-loading-messages {
+  background-color: #f5f7f9;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 140, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Mobile responsiveness */
 @media (max-width: 992px) {
   .chat-page-wrapper {
@@ -1145,6 +1217,11 @@
 
   .attach-menu-container.show {
     transform: translateY(0);
+  }
+
+  /* Override the transform for mobile view */
+  .chat-sidebar-close {
+    transform: translateX(-100%);
   }
 }
 
