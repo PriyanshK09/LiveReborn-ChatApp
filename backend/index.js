@@ -452,21 +452,39 @@ app.get('/api/chats/:userId', authenticateToken, async (req, res) => {
 
 app.get('/api/messages/:chatId', authenticateToken, async (req, res) => {
   try {
-    const { chatId } = req.params;
-    
+    const chatId = mongoose.Types.ObjectId.isValid(req.params.chatId) ? new mongoose.Types.ObjectId(req.params.chatId) : null;
+    if (!chatId) {
+      return res.status(400).json({ error: 'Invalid chat ID' });
+    }
+
     const chat = await Chat.findById(chatId);
     if (!chat || !chat.participants.includes(req.user.regno)) {
       return res.status(403).json({ error: 'Not authorized to access this chat' });
     }
-    
+
     const messages = await Message.find({ chatId }).sort({ createdAt: 1 });
-    
+
+    // Enrich messages with sender details if not already present
+    const enrichedMessages = await Promise.all(messages.map(async (msg) => {
+      const message = msg.toObject();
+      
+      // If sender name is missing, fetch it
+      if (!message.senderName) {
+        const sender = await User.findOne({ regno: message.sender });
+        if (sender) {
+          message.senderName = sender.name;
+        }
+      }
+      
+      return message;
+    }));
+
     await Message.updateMany(
       { chatId, sender: { $ne: req.user.regno } },
       { $addToSet: { read: req.user.regno } }
     );
-    
-    res.json(messages);
+
+    res.json(enrichedMessages);
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Failed to fetch messages' });
@@ -476,29 +494,24 @@ app.get('/api/messages/:chatId', authenticateToken, async (req, res) => {
 app.post('/api/chats', authenticateToken, async (req, res) => {
   try {
     const { participants, name, isGroup, type } = req.body;
-    
     if (!participants.includes(req.user.regno)) {
       participants.push(req.user.regno);
     }
-    
     if (!isGroup && participants.length === 2) {
       const existingChat = await Chat.findOne({
         isGroup: false,
         participants: { $all: participants, $size: 2 }
       });
-      
       if (existingChat) {
         return res.json({ id: existingChat._id });
       }
     }
-    
     const chat = new Chat({
       name: isGroup ? name : null,
       isGroup,
       participants,
       type: type || 'personal'
     });
-    
     await chat.save();
     
     res.status(201).json({ id: chat._id });
@@ -510,31 +523,80 @@ app.post('/api/chats', authenticateToken, async (req, res) => {
 
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
-    const { chatId, text, encryptedData } = req.body;
-    
+    const { chatId, text, encryptedData, plainText } = req.body;
+    // Validate chatId as a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return res.status(400).json({ error: 'Invalid chat ID' });
+    }
+
     const chat = await Chat.findById(chatId);
     if (!chat || !chat.participants.includes(req.user.regno)) {
       return res.status(403).json({ error: 'Not authorized to send messages to this chat' });
     }
-    
+
+    // Fetch the sender's user data to get the name
+    const sender = await User.findOne({ regno: req.user.regno });
+    const senderName = sender ? sender.name : `User ${req.user.regno}`;
+
     const message = new Message({
       chatId,
       sender: req.user.regno,
-      text,
+      senderName: senderName, // Store sender name directly in the message
+      text: plainText || text, // Store plaintext message
       isEncrypted: !!encryptedData,
-      encryptedData
+      encryptedData,
     });
-    
+
     await message.save();
-    
-    chat.lastMessage = text || '🔒 Encrypted message';
+
+    // Update last message in chat with sender name prefix
+    const displayName = `${senderName}: ${plainText || text || '🔒 Encrypted message'}`;
+    chat.lastMessage = displayName.length > 50 ? displayName.substring(0, 47) + '...' : displayName;
     chat.lastMessageTime = new Date();
     await chat.save();
-    
+
     res.status(201).json(message);
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// Add a new endpoint to get all users in a chat
+app.get('/api/chats/:chatId/users', authenticateToken, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    
+    // Validate chatId
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return res.status(400).json({ error: 'Invalid chat ID' });
+    }
+
+    // Find the chat and check if the requester is a participant
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    
+    if (!chat.participants.includes(req.user.regno)) {
+      return res.status(403).json({ error: 'Not authorized to access this chat' });
+    }
+    
+    // Get all users in the chat
+    const users = await User.find({ regno: { $in: chat.participants } });
+    
+    // Format the response to include only necessary fields
+    const formattedUsers = users.map(user => ({
+      regno: user.regno,
+      name: user.name,
+      profilePicture: user.profilePicture,
+      online: user.online
+    }));
+    
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error fetching chat users:', error);
+    res.status(500).json({ error: 'Failed to fetch chat users' });
   }
 });
 
@@ -557,7 +619,6 @@ app.post('/api/chat-requests', authenticateToken, async (req, res) => {
         { sender: recipient, recipient }
       ]
     });
-
     if (existingRequest) {
       return res.status(400).json({ error: 'A chat request already exists between these users' });
     }
@@ -567,7 +628,6 @@ app.post('/api/chat-requests', authenticateToken, async (req, res) => {
       isGroup: false,
       participants: { $all: [sender, recipient], $size: 2 }
     });
-
     if (existingChat) {
       return res.status(400).json({ error: 'A chat already exists between these users' });
     }
@@ -587,13 +647,9 @@ app.post('/api/chat-requests', authenticateToken, async (req, res) => {
 
     // Fetch sender details
     const senderUser = await User.findOne({ regno: sender });
-
-    // Extract first name and full name
     const senderName = senderUser?.name || `User ${sender}`;
     const senderFirstName = senderUser?.name?.split(' ')[0] || `User`;
     const senderAvatar = senderUser?.profilePicture || `/uploads/${sender}.jpg`;
-
-    // Generate sender display name
     const senderDisplayName = `${senderFirstName} (${sender})`;
 
     if (recipientSocketId) {
@@ -625,18 +681,13 @@ app.get('/api/chat-requests', authenticateToken, async (req, res) => {
       recipient: userId,
       status: 'pending'
     }).sort({ createdAt: -1 });
-    
+
     // Format response with sender details
     const formattedRequests = await Promise.all(chatRequests.map(async (request) => {
-      // Use findOne instead of find to get a single user document
       const sender = await User.findOne({ regno: request.sender });
-      
-      // Extract first name from full name
       const firstName = sender && sender.name ? 
         sender.name.split(' ')[0] : 
         'User';
-      
-      // Generate sender display name with format: "FirstName (RegNo)"
       const senderDisplayName = sender ? 
         `${firstName} (${request.sender})` : 
         `User ${request.sender}`;
@@ -676,7 +727,6 @@ app.post('/api/chat-requests/:id/respond', authenticateToken, async (req, res) =
       recipient: userId,
       status: 'pending'
     });
-    
     if (!chatRequest) {
       return res.status(404).json({ error: 'Chat request not found' });
     }
@@ -684,7 +734,7 @@ app.post('/api/chat-requests/:id/respond', authenticateToken, async (req, res) =
     // Update request status
     chatRequest.status = action === 'accept' ? 'accepted' : 'rejected';
     await chatRequest.save();
-    
+
     // If accepted, create a new chat
     let chatId = null;
     if (action === 'accept') {
@@ -697,7 +747,7 @@ app.post('/api/chat-requests/:id/respond', authenticateToken, async (req, res) =
       
       await chat.save();
       chatId = chat._id;
-      
+
       // Emit socket event to sender if online
       const io = req.app.get('io');
       const senderSocketId = io?.connectedUsers?.[chatRequest.sender];
@@ -708,7 +758,7 @@ app.post('/api/chat-requests/:id/respond', authenticateToken, async (req, res) =
         });
       }
     }
-    
+
     res.json({ success: true, chatId });
   } catch (error) {
     console.error('Error responding to chat request:', error);

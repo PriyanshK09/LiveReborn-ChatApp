@@ -33,17 +33,14 @@ const formatLastSeen = (lastSeenDate) => {
   const lastSeen = new Date(lastSeenDate);
   const now = new Date();
   
-  // Get the difference in milliseconds
   const diffMs = now - lastSeen;
   const diffSecs = Math.floor(diffMs / 1000);
   const diffMins = Math.floor(diffSecs / 60);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
   
-  // Check if it's today
   const isToday = lastSeen.toDateString() === now.toDateString();
   
-  // Check if it's yesterday
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
   const isYesterday = lastSeen.toDateString() === yesterday.toDateString();
@@ -59,7 +56,6 @@ const formatLastSeen = (lastSeenDate) => {
   } else if (diffDays < 7) {
     return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
   } else {
-    // If more than a week ago, show the date
     return `on ${lastSeen.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   }
 };
@@ -79,13 +75,13 @@ function ChatPage() {
   const [loading, setLoading] = useState(true)
   const [socket, setSocket] = useState(null)
   const [user, setUser] = useState(null)
-  const [keyPair, setKeyPair] = useState(null)
-  const [publicKeys, setPublicKeys] = useState({})
+  const [siteKey, setSiteKey] = useState(null)
   const [showNewChatModal, setShowNewChatModal] = useState(false)
   const [showRequestsModal, setShowRequestsModal] = useState(false)
   const [pendingRequests, setPendingRequests] = useState(0)
   const [sendingRequest, setSendingRequest] = useState(false)
   const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768)
+  const [chatUsers, setChatUsers] = useState({})
 
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
@@ -94,19 +90,8 @@ function ChatPage() {
   const inputRef = useRef(null)
   
   useEffect(() => {
-    const savedKeyPair = localStorage.getItem('encryptionKeys')
-    
-    if (savedKeyPair) {
-      setKeyPair(JSON.parse(savedKeyPair))
-    } else {
-      const encrypt = new JSEncrypt({ default_key_size: 2048 })
-      const publicKey = encrypt.getPublicKey()
-      const privateKey = encrypt.getPrivateKey()
-      
-      const newKeyPair = { publicKey, privateKey }
-      setKeyPair(newKeyPair)
-      localStorage.setItem('encryptionKeys', JSON.stringify(newKeyPair))
-    }
+    const SITE_ENCRYPTION_KEY = "LPU_LIVE_SECURE_MESSAGING_KEY_2024";
+    setSiteKey(SITE_ENCRYPTION_KEY);
   }, [])
 
   useEffect(() => {
@@ -129,13 +114,6 @@ function ChatPage() {
     
     newSocket.on('connect', () => {
       console.log('Connected to Socket.IO server')
-      
-      if (keyPair) {
-        newSocket.emit('share_public_key', { 
-          userId: userData.regno,
-          publicKey: keyPair.publicKey 
-        })
-      }
     })
     
     newSocket.on('connect_error', (error) => {
@@ -150,63 +128,58 @@ function ChatPage() {
       console.error('Socket.IO reconnection error:', error);
     });
     
-    newSocket.on('public_keys', (keys) => {
-      setPublicKeys(keys)
-    })
-    
     newSocket.on('receive_message', (encryptedData) => {
-      if (!keyPair) return
+      if (!siteKey) return;
       
       try {
-        const decrypt = new JSEncrypt()
-        decrypt.setPrivateKey(keyPair.privateKey)
-        const symmetricKey = decrypt.decrypt(encryptedData.encryptedKey)
-        
         const decryptedBytes = CryptoJS.AES.decrypt(
           encryptedData.encryptedMessage,
-          symmetricKey
-        )
+          siteKey
+        );
         
-        const decryptedMessage = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
+        const decryptedMessage = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8));
         
         if (decryptedMessage.chatId === activeChat) {
           setMessages(prev => [...prev, {
             id: Date.now(),
             sender: decryptedMessage.sender,
+            senderName: `${decryptedMessage.senderName}: ${decryptedMessage.sender}`,
             text: decryptedMessage.text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isMe: decryptedMessage.sender === userData.regno
-          }])
+          }]);
           
-          setShouldScrollToBottom(true)
+          setShouldScrollToBottom(true);
         }
+        
+        const senderDisplay = decryptedMessage.sender === userData.regno ? 
+          'You' : 
+          `${decryptedMessage.senderName}`;
         
         setChats(prevChats => 
           prevChats.map(chat => 
             chat.id === decryptedMessage.chatId 
               ? { 
                   ...chat, 
-                  lastMessage: `${decryptedMessage.sender === userData.regno ? 'You' : decryptedMessage.senderName}: ${decryptedMessage.text}`,
+                  lastMessage: `${senderDisplay}: ${decryptedMessage.text}`,
                   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                   unread: decryptedMessage.sender === userData.regno || activeChat === chat.id ? 0 : chat.unread + 1 
                 }
               : chat
           )
-        )
+        );
       } catch (error) {
-        console.error('Error decrypting message:', error)
+        console.error('Error decrypting message:', error);
       }
-    })
+    });
     
     newSocket.on('chat_request', (data) => {
       setPendingRequests(prev => prev + 1);
 
-      // Create a proper message with a strong preference for the formatted display name
       const senderForDisplay = data.senderDisplayName || 
                               (data.senderFirstName ? `${data.senderFirstName} (${data.sender})` : 
                               (data.senderName ? data.senderName : `User ${data.sender}`));
 
-      // Create the notification with the properly formatted sender name
       const notification = new Notification('New Message Request', {
         body: `${senderForDisplay} wants to start a conversation with you.`,
         icon: '/images/lpu-logo.png'
@@ -237,16 +210,14 @@ function ChatPage() {
         newSocket.disconnect()
       }
     }
-  }, [keyPair, navigate])
+  }, [siteKey, navigate])
 
   useEffect(() => {
     if (socket) {
-      // Listen for user status updates
       socket.on('user_status', ({ userId, online }) => {
         console.log(`User ${userId} is now ${online ? 'online' : 'offline'}`);
         setChats(prevChats =>
           prevChats.map(chat => {
-            // Check if this is a direct chat with the user whose status changed
             if (!chat.isGroup && chat.participants && 
                 chat.participants.includes(userId) && 
                 chat.participants.find(p => p !== user.regno) === userId) {
@@ -283,12 +254,10 @@ function ChatPage() {
       }
     }
     
-    // Fetch pending requests immediately when user is set
     if (user) {
       fetchPendingRequests()
     }
     
-    // Set up interval to refresh pending requests every 30 seconds
     const intervalId = setInterval(() => {
       if (user) {
         fetchPendingRequests()
@@ -299,7 +268,6 @@ function ChatPage() {
       Notification.requestPermission()
     }
     
-    // Clean up interval on unmount
     return () => clearInterval(intervalId)
   }, [user])
 
@@ -326,96 +294,136 @@ function ChatPage() {
   useEffect(() => {
     if (activeChat !== null && user) {
       fetchMessages(activeChat, user.regno)
+      fetchChatUsers(activeChat)
     }
   }, [activeChat, user])
   
+  const fetchChatUsers = async (chatId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/chats/${chatId}/users`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch chat users');
+
+      const data = await response.json();
+      const userMap = {};
+      
+      data.forEach(user => {
+        userMap[user.regno] = user;
+      });
+      
+      setChatUsers(userMap);
+    } catch (error) {
+      console.error('Error fetching chat users:', error);
+    }
+  };
+  
   const fetchMessages = async (chatId, userId) => {
     try {
-      setLoading(true)
+      setLoading(true);
       const response = await fetch(`http://localhost:5000/api/messages/${chatId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      })
-      
-      if (!response.ok) throw new Error('Failed to fetch messages')
-      
-      const data = await response.json()
-      
-      const formattedMessages = data.map(msg => ({
-        id: msg._id,
-        sender: msg.sender,
-        text: msg.text,
-        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: msg.sender === userId
-      }))
-      
-      setMessages(formattedMessages)
-      setLoading(false)
-      
-      if (socket) {
-        socket.emit('mark_messages_read', { chatId, userId })
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch messages');
+
+      const data = await response.json();
+
+      const formattedMessages = data.map((msg) => {
+        const senderUser = chatUsers[msg.sender] || { name: "Unknown User" };
+        const senderDisplayName = `${senderUser.name || 'User'}: ${msg.sender}`;
         
-        setChats(prevChats => 
-          prevChats.map(chat => 
-            chat.id === chatId ? { ...chat, unread: 0 } : chat
-          )
-        )
+        let messageText = msg.text;
+        if (msg.isEncrypted && msg.encryptedData && siteKey) {
+          try {
+            const decryptedBytes = CryptoJS.AES.decrypt(
+              msg.encryptedData.encryptedMessage,
+              siteKey
+            );
+            
+            const decryptedMessage = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8));
+            messageText = decryptedMessage.text;
+          } catch (error) {
+            console.error('Error decrypting message:', error);
+            messageText = '🔒 Encrypted message';
+          }
+        }
+        
+        return {
+          id: msg._id,
+          sender: msg.sender,
+          senderName: senderDisplayName,
+          text: messageText,
+          time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: msg.sender === userId,
+        };
+      });
+
+      setMessages(formattedMessages);
+      setLoading(false);
+
+      if (socket) {
+        socket.emit('mark_messages_read', { chatId: chatId.toString(), userId });
+
+        setChats((prevChats) =>
+          prevChats.map((chat) => (chat.id === chatId ? { ...chat, unread: 0 } : chat))
+        );
       }
-      
-      setShouldScrollToBottom(true)
+
+      setShouldScrollToBottom(true);
     } catch (error) {
-      console.error('Error fetching messages:', error)
-      setLoading(false)
+      console.error('Error fetching messages:', error);
+      setLoading(false);
     }
-  }
+  };
 
   const sendEncryptedMessage = (text, chatId, recipientId) => {
-    if (!socket || !keyPair) return
-    
+    if (!socket || !siteKey) return;
+  
     try {
-      const recipientPublicKey = publicKeys[recipientId]
-      if (!recipientPublicKey) {
-        console.error('Recipient public key not found')
-        return
+      if (!chatId) {
+        console.error('Invalid chat ID provided');
+        return;
       }
       
-      const symmetricKey = CryptoJS.lib.WordArray.random(16).toString()
-      
       const messageObj = {
-        chatId,
+        chatId: chatId.toString(),
         sender: user.regno,
         senderName: user.name,
         text,
         timestamp: new Date().toISOString()
-      }
+      };
       
+      console.log('Sending message to chat ID:', chatId);
+  
       const encryptedMessage = CryptoJS.AES.encrypt(
         JSON.stringify(messageObj),
-        symmetricKey
-      ).toString()
-      
-      const encrypt = new JSEncrypt()
-      encrypt.setPublicKey(recipientPublicKey)
-      const encryptedKey = encrypt.encrypt(symmetricKey)
-      
+        siteKey
+      ).toString();
+  
       socket.emit('send_message', {
-        to: recipientId,
+        to: chatId,
         encryptedMessage,
-        encryptedKey
-      })
-      
+        plainText: text
+      });
+  
       const newMessage = {
         id: Date.now(),
         sender: user.regno,
+        senderName: `${user.name}: ${user.regno}`,
         text,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isMe: true
-      }
-      
-      setMessages(prev => [...prev, newMessage])
-      setShouldScrollToBottom(true)
-      
+      };
+  
+      setMessages(prev => [...prev, newMessage]);
+      setShouldScrollToBottom(true);
+  
       setChats(prevChats => 
         prevChats.map(chat => 
           chat.id === chatId 
@@ -426,11 +434,11 @@ function ChatPage() {
               }
             : chat
         )
-      )
+      );
     } catch (error) {
-      console.error('Error encrypting/sending message:', error)
+      console.error('Error encrypting/sending message:', error);
     }
-  }
+  };
 
   const handleSendMessage = (e) => {
     e.preventDefault()
@@ -438,12 +446,8 @@ function ChatPage() {
     
     const currentChat = chats.find(chat => chat.id === activeChat)
     if (!currentChat) return
-    
-    const recipientId = currentChat.isGroup 
-      ? currentChat.id 
-      : currentChat.participants.find(p => p !== user.regno)
       
-    sendEncryptedMessage(message.trim(), activeChat, recipientId)
+    sendEncryptedMessage(message.trim(), activeChat, activeChat)
     setMessage("")
     
     if (inputRef.current) {
@@ -486,15 +490,28 @@ function ChatPage() {
   };
 
   const getMessageAvatar = (message) => {
-    const sender = chats.find((c) => c.id === activeChat)?.participants.find(p => p === message.sender);
-    if (sender && sender.avatar) {
+    const senderUser = chatUsers[message.sender];
+    
+    if (senderUser && senderUser.profilePicture) {
       return (
-        <img src={`http://localhost:5000${sender.avatar}`} alt={message.sender || 'User'} />
+        <img 
+          src={`http://localhost:5000${senderUser.profilePicture}`} 
+          alt={senderUser.name || 'User'} 
+        />
       );
     } else {
+      const initials = senderUser && senderUser.name
+        ? senderUser.name
+            .split(" ")
+            .map((word) => word[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase()
+        : message.sender.substring(0, 2).toUpperCase();
+        
       return (
         <div className="chat-message-avatar-placeholder">
-          {message.sender ? message.sender.substring(0, 2) : "??"}
+          {initials}
         </div>
       );
     }
@@ -554,7 +571,6 @@ function ChatPage() {
     try {
       setSendingRequest(true);
       
-      // Make only the API call, and the server will handle the socket emission
       const response = await fetch('http://localhost:5000/api/chat-requests', {
         method: 'POST',
         headers: {
@@ -641,7 +657,6 @@ function ChatPage() {
   };
 
   const filteredChats = chats.filter((chat) => {
-    // Check if chat and chat.name are defined before using toLowerCase()
     const matchesSearch = chat?.name 
       ? chat.name.toLowerCase().includes(searchQuery.toLowerCase())
       : false;
@@ -863,7 +878,11 @@ function ChatPage() {
                         <div className="chat-message-avatar">{getMessageAvatar(message)}</div>
                       )}
                       <div className="chat-message-content">
-                        {!message.isMe && showSender && <p className="chat-message-sender">{message.sender}</p>}
+                        {!message.isMe && showSender && (
+                          <p className="chat-message-sender">
+                            {message.senderName || `User ${message.sender}`}
+                          </p>
+                        )}
                         <div className="chat-message-bubble">
                           <p>{message.text}</p>
                           <span className="chat-message-time">{message.time}</span>

@@ -1,12 +1,13 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { User, Chat, Message, ChatRequest } from './models.js';
 
 dotenv.config();
 
-// Store user's public keys in memory for quick access
-const publicKeys = {};
+// Replace publicKeys with a single site-wide encryption key
+const SITE_ENCRYPTION_KEY = "LPU_LIVE_SECURE_MESSAGING_KEY_2024";
 const connectedUsers = {};
 
 export function setupSocketIO(server) {
@@ -71,78 +72,89 @@ export function setupSocketIO(server) {
       console.error('Error updating user online status:', error);
     }
     
-    // Register user's public key
-    socket.on('share_public_key', async (data) => {
-      try {
-        // Store in memory for quick access
-        publicKeys[data.userId] = data.publicKey;
-        
-        // Also store in database for persistence
-        await User.findOneAndUpdate(
-          { regno: data.userId },
-          { publicKey: data.publicKey },
-          { upsert: true }
-        );
-        
-        // Share all available public keys with this user
-        socket.emit('public_keys', publicKeys);
-      } catch (error) {
-        console.error('Error storing public key:', error);
-      }
-    });
+    // Remove the share_public_key handler as it's no longer needed
     
-    // Send encrypted message
+    // Update the send_message handler to use symmetric encryption
     socket.on('send_message', async (data) => {
       try {
-        // Find the chat that contains both sender and recipient
-        const chat = await Chat.findOne({ 
-          $or: [
-            { isGroup: true, _id: data.to },
-            { isGroup: false, participants: { $all: [userId, data.to] } }
-          ]
-        });
+        // First, determine if we received a chat ID or a user registration number
+        let chatId = null;
+        let chat = null;
+        
+        // Check if data.to is a valid MongoDB ObjectID
+        if (mongoose.Types.ObjectId.isValid(data.to)) {
+          chatId = new mongoose.Types.ObjectId(data.to);
+          // Try to find the chat by ID
+          chat = await Chat.findById(chatId);
+        } 
+        
+        // If no valid chat was found and data.to isn't an ObjectID, it might be a user ID
+        if (!chat) {
+          // Look for a direct chat between the current user and the recipient
+          chat = await Chat.findOne({
+            isGroup: false,
+            participants: { $all: [userId, data.to], $size: 2 }
+          });
+          
+          if (chat) {
+            chatId = chat._id;
+          } else {
+            console.error('No chat found between', userId, 'and', data.to);
+            return;
+          }
+        }
         
         if (!chat) {
-          console.error('Chat not found');
+          console.error('Chat not found for ID or recipient:', data.to);
           return;
         }
         
-        // Create and save the encrypted message
+        // Find the sender's user object to get their name
+        const senderUser = await User.findOne({ regno: userId });
+        const senderName = senderUser?.name || `User ${userId}`;
+        
+        // Extract plain text if provided
+        const plainText = data.plainText || null;
+        
+        // Create and save the message with both encrypted and plain text
         const newMessage = new Message({
           chatId: chat._id,
           sender: userId,
+          senderName: senderName, // Store sender name in the message
+          text: plainText, // Save plain text version 
           isEncrypted: true,
           encryptedData: {
             encryptedMessage: data.encryptedMessage,
-            encryptedKey: data.encryptedKey,
           }
         });
         
         await newMessage.save();
         
         // Update the chat's last message
-        chat.lastMessage = '🔒 Encrypted message';
+        const displayMessage = `${senderName}: ${plainText || '🔒 Encrypted message'}`;
+        chat.lastMessage = displayMessage.length > 50 ? displayMessage.substring(0, 47) + '...' : displayMessage;
         chat.lastMessageTime = new Date();
         await chat.save();
         
-        // Forward the encrypted message to the recipient
+        // Forward the encrypted message to the recipient(s)
         if (chat.isGroup) {
           // For group chats, send to all participants
           chat.participants.forEach(participant => {
             if (participant !== userId && connectedUsers[participant]) {
               io.to(connectedUsers[participant]).emit('receive_message', {
                 encryptedMessage: data.encryptedMessage,
-                encryptedKey: data.encryptedKey
+                senderName: senderName
               });
             }
           });
         } else {
           // For direct messages
-          const recipientSocketId = connectedUsers[data.to];
+          const recipient = chat.participants.find(p => p !== userId);
+          const recipientSocketId = connectedUsers[recipient];
           if (recipientSocketId) {
             io.to(recipientSocketId).emit('receive_message', {
               encryptedMessage: data.encryptedMessage,
-              encryptedKey: data.encryptedKey
+              senderName: senderName
             });
           }
         }

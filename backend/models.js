@@ -8,7 +8,6 @@ const userSchema = new mongoose.Schema({
   department: String,
   profilePicture: String,
   password: String,
-  publicKey: String,
   online: { type: Boolean, default: false },
   lastSeen: Date
 });
@@ -17,6 +16,7 @@ const userSchema = new mongoose.Schema({
 const messageSchema = new mongoose.Schema({
   chatId: String,
   sender: String,
+  senderName: String, // Add sender name field
   text: String,
   isEncrypted: { type: Boolean, default: true },
   encryptedData: Object,
