@@ -157,30 +157,87 @@ app.post('/login', async (req, res) => {
     let regnoExtracted = '';
     let department = '';
     try {
-      const hasPNameElement = await page.$('#p_name') !== null;
-      if (hasPNameElement) {
-        name = await page.$eval('#p_name', el => el.textContent.trim());
-        const regnoElement = await page.$('.profile_name .text-muted, .student-info .text-muted');
-        if (regnoElement) {
-          const regnoText = await page.evaluate(el => el.textContent.trim(), regnoElement);
-          const regMatch = regnoText.match(/(\d+)/);
-          if (regMatch && regMatch[1]) {
-            regnoExtracted = regMatch[1];
+      const nameSelectors = [
+        '#p_name',
+        '.profile_name h4', 
+        '.student-info h4',
+        '.user-details h4',
+        '#ctl00_cphHeading_lblStudentName',
+        '.student-name',
+        '.profile-name'
+      ];
+      
+      for (const selector of nameSelectors) {
+        try {
+          const hasElement = await page.$(selector) !== null;
+          if (hasElement) {
+            name = await page.$eval(selector, el => el.textContent.trim());
+            console.log(`Found name using selector ${selector}: "${name}"`);
+            if (name && name !== 'Unknown' && name.length > 1) break;
           }
+        } catch (err) {
+          console.log(`Selector ${selector} failed:`, err.message);
         }
       }
-      if (!name) {
-        const hasProfileNameDiv = await page.$('.profile_name') !== null;
-        if (hasProfileNameDiv) {
-          const userDetailsText = await page.$eval('.profile_name span.aspLabel', el => el.textContent.trim());
-          const userDetailsMatch = userDetailsText.match(/^(.*?)\s*\((\d+)\)$/);
-          if (userDetailsMatch && userDetailsMatch.length >= 3) {
-            name = userDetailsMatch[1].trim();
-            regnoExtracted = userDetailsMatch[2].trim();
+      
+      if (!name || name === 'Unknown' || name.length <= 1) {
+        try {
+          const hasProfileNameDiv = await page.$('.profile_name') !== null;
+          if (hasProfileNameDiv) {
+            const profileContent = await page.$eval('.profile_name', div => div.innerHTML);
+            console.log('Profile content:', profileContent);
+            
+            const nameMatch = profileContent.match(/<h4[^>]*>(.*?)<\/h4>/i) || 
+                              profileContent.match(/<span[^>]*>((?!Registration|Reg)[^()]*?)(?:\s*\(|<\/span>)/i);
+            
+            if (nameMatch && nameMatch[1]) {
+              name = nameMatch[1].replace(/<[^>]*>/g, '').trim();
+              console.log(`Extracted name from profile content: "${name}"`);
+            }
           }
+        } catch (err) {
+          console.log('Profile name extraction failed:', err.message);
         }
       }
-      if (!name || name === 'Unknown') {
+      
+      if (!name || name === 'Unknown' || name.length <= 1) {
+        try {
+          name = await page.evaluate(() => {
+            const elements = Array.from(document.querySelectorAll('h1, h2, h3, h4, div, span, p'));
+            for (const el of elements) {
+              const text = el.innerText || '';
+              if (text.toLowerCase().includes('welcome') || text.toLowerCase().includes('hello')) {
+                const match = text.match(/(?:welcome|hello)(?:\s+back)?\s+(?:to\s+)?([^.,!]+)/i);
+                if (match && match[1].trim().length > 1) {
+                  return match[1].trim();
+                }
+              }
+            }
+            return null;
+          });
+          if (name) console.log(`Extracted name from welcome message: "${name}"`);
+        } catch (err) {
+          console.log('Welcome message extraction failed:', err.message);
+        }
+      }
+      
+      if (!name || name === 'Unknown' || name.length <= 1) {
+        try {
+          const title = await page.title();
+          console.log('Page title:', title);
+          if (title && !title.toLowerCase().includes('login')) {
+            const titleParts = title.split('-').map(p => p.trim());
+            if (titleParts.length > 1 && titleParts[0].length > 1) {
+              name = titleParts[0];
+              console.log(`Extracted name from page title: "${name}"`);
+            }
+          }
+        } catch (err) {
+          console.log('Title extraction failed:', err.message);
+        }
+      }
+      
+      if (!name || name === 'Unknown' || name.length <= 1) {
         const userDetailsSelectors = [
           '#ctl00_cphHeading_Logoutout1_lblId',
           '.profile_name span',
@@ -209,10 +266,14 @@ app.post('/login', async (req, res) => {
           }
         }
       }
-      if (!name || name === 'Unknown') {
-        regnoExtracted = regno;
-        name = 'Unknown';
+      console.log(`Final name after all extraction attempts: "${name}"`);
+      if (!name || name === 'Unknown' || name.length <= 1) {
+        name = `Student ${regno}`;
       }
+
+      name = name.replace(/\s{2,}/g, ' ').trim();
+      name = name.replace(/[^\w\s.]/gi, '').trim();
+
       try {
         const departmentInfo = await page.evaluate(() => {
           const links = Array.from(document.querySelectorAll('a[onclick^="showPO"]'));
@@ -271,16 +332,26 @@ app.post('/login', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    console.log(`Name to be saved: "${name}"`);
+    
     const userData = { 
       regno: regnoExtracted || regno, 
-      name: name !== 'Unknown' ? name : 'LPU Student',
+      name: name && name !== 'Unknown' && name.length > 1 ? name : `Student ${regno}`,
       department, 
       profilePicture: imagePath,
       email: `${regnoExtracted || regno}@lpu.in`,
       password: hashedPassword
     };
 
-    await User.findOneAndUpdate({ regno: regnoExtracted || regno }, userData, { upsert: true, new: true });
+    console.log('User data to be saved:', userData);
+
+    const updatedUser = await User.findOneAndUpdate(
+      { regno: regnoExtracted || regno },
+      userData,
+      { upsert: true, new: true, runValidators: true }
+    );
+    
+    console.log('Saved user data:', updatedUser);
 
     await browser.close();
 
@@ -290,12 +361,12 @@ app.post('/login', async (req, res) => {
       message: 'Login successful',
       token,
       user: { 
-        name, 
-        regno: regnoExtracted || regno,
-        department,
-        profilePicture: imagePath
+        name: updatedUser.name,
+        regno: updatedUser.regno,
+        department: updatedUser.department,
+        profilePicture: updatedUser.profilePicture
       },
-      userData
+      userData: updatedUser
     });
   } catch (error) {
     console.error('Error during login process:', error);
@@ -331,6 +402,7 @@ app.get('/api/chats/:userId', authenticateToken, async (req, res) => {
       let name = chat.name;
       let status = "offline";
       let avatar = null;
+      let lastSeen = null;
       
       if (!chat.isGroup) {
         const otherParticipantId = chat.participants.find(p => p !== userId);
@@ -339,6 +411,11 @@ app.get('/api/chats/:userId', authenticateToken, async (req, res) => {
           if (otherUser) {
             name = otherUser.name;
             avatar = otherUser.profilePicture;
+            status = otherUser.online ? "online" : "offline"; 
+            // Include lastSeen information for offline users
+            if (!otherUser.online && otherUser.lastSeen) {
+              lastSeen = otherUser.lastSeen;
+            }
           }
         }
       }
@@ -355,6 +432,7 @@ app.get('/api/chats/:userId', authenticateToken, async (req, res) => {
         avatar,
         isGroup: chat.isGroup,
         status,
+        lastSeen,
         lastMessage: chat.lastMessage || "No messages yet",
         time: chat.lastMessageTime ? new Date(chat.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
         unread: unreadCount,
@@ -465,13 +543,13 @@ app.post('/api/chat-requests', authenticateToken, async (req, res) => {
   try {
     const { recipient, message } = req.body;
     const sender = req.user.regno;
-    
+
     // Check if recipient exists
     const recipientUser = await User.findOne({ regno: recipient });
     if (!recipientUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Check if a request already exists
     const existingRequest = await ChatRequest.findOne({
       $or: [
@@ -479,43 +557,58 @@ app.post('/api/chat-requests', authenticateToken, async (req, res) => {
         { sender: recipient, recipient }
       ]
     });
-    
+
     if (existingRequest) {
       return res.status(400).json({ error: 'A chat request already exists between these users' });
     }
-    
+
     // Check if a chat already exists between these users
     const existingChat = await Chat.findOne({
       isGroup: false,
       participants: { $all: [sender, recipient], $size: 2 }
     });
-    
+
     if (existingChat) {
       return res.status(400).json({ error: 'A chat already exists between these users' });
     }
-    
+
     // Create a new chat request
     const chatRequest = new ChatRequest({
       sender,
       recipient,
       message
     });
-    
+
     await chatRequest.save();
-    
+
     // Emit socket event to recipient if online
     const io = req.app.get('io');
     const recipientSocketId = io?.connectedUsers?.[recipient];
+
+    // Fetch sender details
+    const senderUser = await User.findOne({ regno: sender });
+
+    // Extract first name and full name
+    const senderName = senderUser?.name || `User ${sender}`;
+    const senderFirstName = senderUser?.name?.split(' ')[0] || `User`;
+    const senderAvatar = senderUser?.profilePicture || `/uploads/${sender}.jpg`;
+
+    // Generate sender display name
+    const senderDisplayName = `${senderFirstName} (${sender})`;
+
     if (recipientSocketId) {
       io.to(recipientSocketId).emit('chat_request', {
         id: chatRequest._id,
         sender,
-        senderName: req.user.name,
+        senderName,
+        senderFirstName,
+        senderDisplayName,
+        senderAvatar,
         message,
         createdAt: chatRequest.createdAt
       });
     }
-    
+
     res.status(201).json({ id: chatRequest._id });
   } catch (error) {
     console.error('Error creating chat request:', error);
@@ -538,17 +631,28 @@ app.get('/api/chat-requests', authenticateToken, async (req, res) => {
       // Use findOne instead of find to get a single user document
       const sender = await User.findOne({ regno: request.sender });
       
+      // Extract first name from full name
+      const firstName = sender && sender.name ? 
+        sender.name.split(' ')[0] : 
+        'User';
+      
+      // Generate sender display name with format: "FirstName (RegNo)"
+      const senderDisplayName = sender ? 
+        `${firstName} (${request.sender})` : 
+        `User ${request.sender}`;
+      
       return {
         id: request._id,
         sender: request.sender,
         senderName: sender ? sender.name : `User ${request.sender}`,
+        senderFirstName: firstName,
+        senderDisplayName: senderDisplayName,
         senderAvatar: sender ? sender.profilePicture : null,
         message: request.message,
         createdAt: request.createdAt
       };
     }));
     
-    console.log("Formatted requests:", formattedRequests); // Debug log
     res.json(formattedRequests);
   } catch (error) {
     console.error('Error fetching chat requests:', error);

@@ -26,7 +26,6 @@ function ChatRequestsModal({ onClose, onAccept, onReject }) {
       }
       
       const data = await response.json();
-      console.log("Chat requests data:", data); // Debug log to see what's coming from backend
       setRequests(data);
     } catch (error) {
       console.error('Error fetching chat requests:', error);
@@ -125,13 +124,10 @@ function ChatRequestsModal({ onClose, onAccept, onReject }) {
                   </div>
                   <div className="request-content">
                     <div className="request-header">
-                      <h4>{request.senderName || 'User ' + request.sender}</h4>
-                      <span>{request.sender || 'Unknown'}</span>
+                      <h4>{request.senderDisplayName || request.senderName || 'User ' + request.sender}</h4>
+                      <span>{request.createdAt ? new Date(request.createdAt).toLocaleString() : 'Unknown time'}</span>
                     </div>
                     <p className="request-message">{request.message || 'No message'}</p>
-                    <div className="request-timestamp">
-                      {request.createdAt ? new Date(request.createdAt).toLocaleString() : 'Unknown time'}
-                    </div>
                   </div>
                   <div className="request-actions">
                     <button 

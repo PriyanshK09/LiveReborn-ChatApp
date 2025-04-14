@@ -55,10 +55,15 @@ export function setupSocketIO(server) {
       
       // Broadcast user online status to relevant chats
       const userChats = await Chat.find({ participants: userId });
+      console.log(`Broadcasting online status for user ${userId} to ${userChats.length} chats`);
+      
       userChats.forEach(chat => {
-        chat.participants.forEach(participant => {
-          if (participant !== userId && connectedUsers[participant]) {
-            io.to(connectedUsers[participant]).emit('user_status', { userId, online: true });
+        chat.participants.forEach(participantId => {
+          if (participantId !== userId && connectedUsers[participantId]) {
+            io.to(connectedUsers[participantId]).emit('user_status', { 
+              userId, 
+              online: true 
+            });
           }
         });
       });
@@ -150,14 +155,14 @@ export function setupSocketIO(server) {
     socket.on('send_chat_request', async (data) => {
       try {
         const { recipient, message } = data;
-        
+
         // Check if recipient exists
         const recipientUser = await User.findOne({ regno: recipient });
         if (!recipientUser) {
           socket.emit('error', { message: 'User not found' });
           return;
         }
-        
+
         // Check if a request or chat already exists
         const existingRequest = await ChatRequest.findOne({
           $or: [
@@ -165,43 +170,52 @@ export function setupSocketIO(server) {
             { sender: recipient, recipient: userId }
           ]
         });
-        
+
         const existingChat = await Chat.findOne({
           isGroup: false,
           participants: { $all: [userId, recipient], $size: 2 }
         });
-        
+
         if (existingRequest || existingChat) {
           socket.emit('error', { message: 'A chat or request already exists with this user' });
           return;
         }
-        
+
         // Create a new chat request
         const chatRequest = new ChatRequest({
           sender: userId,
           recipient,
           message
         });
-        
+
         await chatRequest.save();
-        
-        // Get sender details
-        const sender = await User.findOne({ regno: userId });
-        
+
+        // Fetch sender details
+        const senderUser = await User.findOne({ regno: userId });
+
+        // Extract first name and full name
+        const senderName = senderUser?.name || `User ${userId}`;
+        const senderFirstName = senderUser?.name?.split(' ')[0] || `User`;
+        const senderAvatar = senderUser?.profilePicture || `/uploads/${userId}.jpg`;
+
+        // Generate sender display name
+        const senderDisplayName = `${senderFirstName} (${userId})`;
+
         // Emit event to recipient if online
         const recipientSocketId = connectedUsers[recipient];
         if (recipientSocketId) {
-          // Make sure to include all necessary sender info
           io.to(recipientSocketId).emit('chat_request', {
             id: chatRequest._id,
             sender: userId,
-            senderName: sender ? sender.name : `User ${userId}`,
-            senderAvatar: sender ? sender.profilePicture : null, // Include profilePicture
+            senderName,
+            senderFirstName,
+            senderDisplayName,
+            senderAvatar,
             message,
             createdAt: chatRequest.createdAt
           });
         }
-        
+
         // Confirm to sender
         socket.emit('chat_request_sent', { success: true });
       } catch (error) {
@@ -257,10 +271,15 @@ export function setupSocketIO(server) {
         
         // Broadcast user offline status to relevant chats
         const userChats = await Chat.find({ participants: userId });
+        console.log(`Broadcasting offline status for user ${userId} to ${userChats.length} chats`);
+        
         userChats.forEach(chat => {
-          chat.participants.forEach(participant => {
-            if (participant !== userId && connectedUsers[participant]) {
-              io.to(connectedUsers[participant]).emit('user_status', { userId, online: false });
+          chat.participants.forEach(participantId => {
+            if (participantId !== userId && connectedUsers[participantId]) {
+              io.to(connectedUsers[participantId]).emit('user_status', { 
+                userId, 
+                online: false 
+              });
             }
           });
         });

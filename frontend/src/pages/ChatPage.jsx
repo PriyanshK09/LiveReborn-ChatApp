@@ -27,6 +27,43 @@ import NewChatModal from "../components/NewChatModal"
 import ChatRequestsModal from "../components/ChatRequestsModal"
 import "../styles/ChatPage.css"
 
+const formatLastSeen = (lastSeenDate) => {
+  if (!lastSeenDate) return '';
+  
+  const lastSeen = new Date(lastSeenDate);
+  const now = new Date();
+  
+  // Get the difference in milliseconds
+  const diffMs = now - lastSeen;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  // Check if it's today
+  const isToday = lastSeen.toDateString() === now.toDateString();
+  
+  // Check if it's yesterday
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = lastSeen.toDateString() === yesterday.toDateString();
+  
+  if (diffSecs < 60) {
+    return 'just now';
+  } else if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (isToday) {
+    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  } else if (isYesterday) {
+    return `yesterday at ${lastSeen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } else if (diffDays < 7) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  } else {
+    // If more than a week ago, show the date
+    return `on ${lastSeen.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+};
+
 function ChatPage() {
   const navigate = useNavigate()
   const [activeChat, setActiveChat] = useState(null)
@@ -162,22 +199,26 @@ function ChatPage() {
     })
     
     newSocket.on('chat_request', (data) => {
-      console.log('New chat request received:', data)
-      setPendingRequests(prev => prev + 1)
-      
+      setPendingRequests(prev => prev + 1);
+
+      // Create a proper message with a strong preference for the formatted display name
+      const senderForDisplay = data.senderDisplayName || 
+                              (data.senderFirstName ? `${data.senderFirstName} (${data.sender})` : 
+                              (data.senderName ? data.senderName : `User ${data.sender}`));
+
+      // Create the notification with the properly formatted sender name
       const notification = new Notification('New Message Request', {
-        body: `${data.senderName} wants to start a conversation with you.`,
+        body: `${senderForDisplay} wants to start a conversation with you.`,
         icon: '/images/lpu-logo.png'
-      })
-      
+      });
+
       notification.onclick = () => {
-        setShowRequestsModal(true)
-        window.focus()
-      }
-    })
+        setShowRequestsModal(true);
+        window.focus();
+      };
+    });
     
     newSocket.on('chat_request_accepted', (data) => {
-      console.log('Chat request accepted:', data)
       fetchChats(userData.regno)
     })
     
@@ -197,6 +238,32 @@ function ChatPage() {
       }
     }
   }, [keyPair, navigate])
+
+  useEffect(() => {
+    if (socket) {
+      // Listen for user status updates
+      socket.on('user_status', ({ userId, online }) => {
+        console.log(`User ${userId} is now ${online ? 'online' : 'offline'}`);
+        setChats(prevChats =>
+          prevChats.map(chat => {
+            // Check if this is a direct chat with the user whose status changed
+            if (!chat.isGroup && chat.participants && 
+                chat.participants.includes(userId) && 
+                chat.participants.find(p => p !== user.regno) === userId) {
+              return { ...chat, status: online ? 'online' : 'offline' };
+            }
+            return chat;
+          })
+        );
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('user_status');
+      }
+    };
+  }, [socket, user]);
 
   useEffect(() => {
     const fetchPendingRequests = async () => {
@@ -670,7 +737,6 @@ function ChatPage() {
                 >
                   <div className="chat-list-avatar">
                     {getAvatar(chat)}
-                    {!chat.isGroup && chat.status === "online" && <div className="chat-status-dot"></div>}
                     {chat.isGroup && (
                       <div className="chat-group-indicator">
                         <Users size={10} />
@@ -744,8 +810,14 @@ function ChatPage() {
                         {chats.find(c => c.id === activeChat)?.online || 0} online • {chats.find(c => c.id === activeChat)?.members || 0} members
                       </span>
                     ) : (
-                      <span>
-                        {chats.find(c => c.id === activeChat)?.status === "online" ? "Online" : "Offline"}
+                      <span className={chats.find(c => c.id === activeChat)?.status === "online" ? "online" : "offline"}>
+                        <span className="status-indicator-dot"></span>
+                        {chats.find(c => c.id === activeChat)?.status === "online" 
+                          ? "Online" 
+                          : chats.find(c => c.id === activeChat)?.lastSeen 
+                            ? `Last seen ${formatLastSeen(chats.find(c => c.id === activeChat)?.lastSeen)}` 
+                            : "Offline"
+                        }
                       </span>
                     )}
                   </div>
