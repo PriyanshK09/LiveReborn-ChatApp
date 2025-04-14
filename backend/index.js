@@ -462,6 +462,7 @@ app.get('/api/messages/:chatId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to access this chat' });
     }
 
+    // Fetch messages - no change needed for retrieving
     const messages = await Message.find({ chatId }).sort({ createdAt: 1 });
 
     // Enrich messages with sender details if not already present
@@ -479,6 +480,7 @@ app.get('/api/messages/:chatId', authenticateToken, async (req, res) => {
       return message;
     }));
 
+    // Update message read status using update with string IDs
     await Message.updateMany(
       { chatId, sender: { $ne: req.user.regno } },
       { $addToSet: { read: req.user.regno } }
@@ -523,7 +525,8 @@ app.post('/api/chats', authenticateToken, async (req, res) => {
 
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
-    const { chatId, text, encryptedData, plainText } = req.body;
+    const { chatId, text, encryptedData, plainText, messageId } = req.body;
+    
     // Validate chatId as a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(chatId)) {
       return res.status(400).json({ error: 'Invalid chat ID' });
@@ -538,11 +541,15 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
     const sender = await User.findOne({ regno: req.user.regno });
     const senderName = sender ? sender.name : `User ${req.user.regno}`;
 
+    // Use the provided messageId if available, otherwise generate one
+    const msgId = messageId ? messageId.toString() : Date.now().toString();
+    
     const message = new Message({
+      _id: msgId,
       chatId,
       sender: req.user.regno,
-      senderName: senderName, // Store sender name directly in the message
-      text: plainText || text, // Store plaintext message
+      senderName: senderName,
+      text: plainText || text,
       isEncrypted: !!encryptedData,
       encryptedData,
     });

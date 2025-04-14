@@ -785,8 +785,8 @@
 }
 
 .chat-message-out .chat-message-bubble {
-  background-color: var(--primary-color);
-  color: white;
+  background-color: #dcf8c6;  /* WhatsApp-like green bubble color */
+  color: #303030;
   border-top-right-radius: 0.25rem;
 }
 
@@ -807,10 +807,65 @@
   right: 0.75rem;
   font-size: 0.65rem;
   opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .chat-message-out .chat-message-time {
-  color: rgba(255, 255, 255, 0.9);
+  color: #667781;
+}
+
+/* Read receipt styles */
+.read-receipt {
+  display: flex;
+  align-items: center;
+  margin-left: 0.15rem;
+}
+
+.read-receipt-icon {
+  width: 1rem;
+  height: 0.75rem;
+  position: relative;
+}
+
+/* Single tick for sent */
+.read-receipt-single {
+  color: #a8bec8;
+}
+
+/* Double tick colors */
+.read-receipt-delivered .first-tick,
+.read-receipt-delivered .second-tick {
+  color: #a8bec8;
+}
+
+.read-receipt-delivered.read-receipt-read .first-tick,
+.read-receipt-delivered.read-receipt-read .second-tick {
+  color: #53bdeb;
+}
+
+/* Tick positions */
+.first-tick {
+  position: absolute;
+  left: 0;
+}
+
+.second-tick {
+  position: absolute;
+  left: 0.15rem;
+}
+
+/* Animation for the read status change */
+@keyframes readAnimation {
+  0% { color: #a8bec8; }
+  50% { color: #7db9cb; }
+  100% { color: #53bdeb; }
+}
+
+.read-receipt-read .first-tick,
+.read-receipt-read .second-tick {
+  animation: readAnimation 0.5s ease forwards;
 }
 
 /* Chat input area */

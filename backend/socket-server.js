@@ -117,7 +117,9 @@ export function setupSocketIO(server) {
         const plainText = data.plainText || null;
         
         // Create and save the message with both encrypted and plain text
+        // Note: We're explicitly creating a new message with the provided ID as a string
         const newMessage = new Message({
+          _id: data.messageId.toString(), // Explicitly convert to string and use as _id
           chatId: chat._id,
           sender: userId,
           senderName: senderName, // Store sender name in the message
@@ -125,7 +127,8 @@ export function setupSocketIO(server) {
           isEncrypted: true,
           encryptedData: {
             encryptedMessage: data.encryptedMessage,
-          }
+          },
+          read: [userId] // Mark as read by sender
         });
         
         await newMessage.save();
@@ -136,14 +139,15 @@ export function setupSocketIO(server) {
         chat.lastMessageTime = new Date();
         await chat.save();
         
-        // Forward the encrypted message to the recipient(s)
+        // Forward the encrypted message to the recipient(s) with the messageId
         if (chat.isGroup) {
           // For group chats, send to all participants
           chat.participants.forEach(participant => {
             if (participant !== userId && connectedUsers[participant]) {
               io.to(connectedUsers[participant]).emit('receive_message', {
                 encryptedMessage: data.encryptedMessage,
-                senderName: senderName
+                senderName: senderName,
+                id: data.messageId // Include the messageId
               });
             }
           });
@@ -154,7 +158,8 @@ export function setupSocketIO(server) {
           if (recipientSocketId) {
             io.to(recipientSocketId).emit('receive_message', {
               encryptedMessage: data.encryptedMessage,
-              senderName: senderName
+              senderName: senderName,
+              id: data.messageId // Include the messageId
             });
           }
         }
@@ -264,6 +269,35 @@ export function setupSocketIO(server) {
         }
       } catch (error) {
         console.error('Error marking messages as read:', error);
+      }
+    });
+    
+    // Handle read receipts
+    socket.on('read_receipt', async (data) => {
+      try {
+        const { messageId, chatId, reader } = data;
+        
+        // Update message read status in database - use string messageId
+        await Message.updateOne(
+          { _id: messageId.toString() }, // Ensure messageId is treated as string
+          { $addToSet: { read: reader } }
+        );
+        
+        // Find original sender of the message - use string messageId
+        const message = await Message.findOne({ _id: messageId.toString() });
+        
+        if (message && message.sender !== reader) {
+          // Notify the sender that their message was read
+          if (connectedUsers[message.sender]) {
+            io.to(connectedUsers[message.sender]).emit('message_read', {
+              messageId,
+              reader,
+              chatId
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error processing read receipt:', error);
       }
     });
     

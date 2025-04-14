@@ -14,9 +14,10 @@ const userSchema = new mongoose.Schema({
 
 // Message schema
 const messageSchema = new mongoose.Schema({
+  _id: { type: String }, // Change _id to String type to accept timestamp IDs
   chatId: String,
   sender: String,
-  senderName: String, // Add sender name field
+  senderName: String,
   text: String,
   isEncrypted: { type: Boolean, default: true },
   encryptedData: Object,

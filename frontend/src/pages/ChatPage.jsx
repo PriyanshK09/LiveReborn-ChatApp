@@ -141,27 +141,32 @@ function ChatPage() {
         
         if (decryptedMessage.chatId === activeChat) {
           setMessages(prev => [...prev, {
-            id: Date.now(),
+            id: decryptedMessage.id || Date.now().toString(),
             sender: decryptedMessage.sender,
             senderName: `${decryptedMessage.senderName}: ${decryptedMessage.sender}`,
             text: decryptedMessage.text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isMe: decryptedMessage.sender === userData.regno
+            isMe: decryptedMessage.sender === userData.regno,
+            status: 'delivered'
           }]);
           
           setShouldScrollToBottom(true);
+          
+          if (decryptedMessage.sender !== userData.regno && decryptedMessage.id) {
+            newSocket.emit('read_receipt', {
+              messageId: decryptedMessage.id,
+              chatId: decryptedMessage.chatId,
+              reader: userData.regno
+            });
+          }
         }
-        
-        const senderDisplay = decryptedMessage.sender === userData.regno ? 
-          'You' : 
-          `${decryptedMessage.senderName}`;
         
         setChats(prevChats => 
           prevChats.map(chat => 
             chat.id === decryptedMessage.chatId 
               ? { 
                   ...chat, 
-                  lastMessage: `${senderDisplay}: ${decryptedMessage.text}`,
+                  lastMessage: `${decryptedMessage.sender === userData.regno ? 'You' : decryptedMessage.senderName}: ${decryptedMessage.text}`,
                   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                   unread: decryptedMessage.sender === userData.regno || activeChat === chat.id ? 0 : chat.unread + 1 
                 }
@@ -171,6 +176,15 @@ function ChatPage() {
       } catch (error) {
         console.error('Error decrypting message:', error);
       }
+    });
+    
+    newSocket.on('message_read', ({ messageId, reader }) => {
+      setMessages(prev => prev.map(message => {
+        if (message.id === messageId && message.isMe) {
+          return { ...message, status: 'read' };
+        }
+        return message;
+      }));
     });
     
     newSocket.on('chat_request', (data) => {
@@ -210,7 +224,7 @@ function ChatPage() {
         newSocket.disconnect()
       }
     }
-  }, [siteKey, navigate])
+  }, [siteKey, navigate, activeChat])
 
   useEffect(() => {
     if (socket) {
@@ -391,7 +405,9 @@ function ChatPage() {
         return;
       }
       
+      const messageId = Date.now().toString();
       const messageObj = {
+        id: messageId,
         chatId: chatId.toString(),
         sender: user.regno,
         senderName: user.name,
@@ -409,16 +425,18 @@ function ChatPage() {
       socket.emit('send_message', {
         to: chatId,
         encryptedMessage,
-        plainText: text
+        plainText: text,
+        messageId
       });
   
       const newMessage = {
-        id: Date.now(),
+        id: messageId,
         sender: user.regno,
         senderName: `${user.name}: ${user.regno}`,
         text,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: true
+        isMe: true,
+        status: 'sent'
       };
   
       setMessages(prev => [...prev, newMessage]);
@@ -517,6 +535,32 @@ function ChatPage() {
     }
   };
 
+  const renderReadReceipt = (message) => {
+    if (!message.isMe) return null;
+    
+    return (
+      <span className="read-receipt">
+        {message.status === 'sent' && (
+          <span className="read-receipt-icon read-receipt-single">
+            <svg viewBox="0 0 16 15" width="16" height="15" className="first-tick">
+              <path fill="currentColor" d="M10.91,3.316l-0.478-0.372c-0.109-0.088-0.268-0.071-0.356,0.038L5.566,8.926l-1.437-1.438c-0.1-0.099-0.262-0.099-0.361,0L3.34,7.915c-0.1,0.099-0.1,0.261,0,0.359l2.205,2.205c0.098,0.098,0.258,0.098,0.357,0c0.043-0.042,3.142-3.138,5.25-5.246l0.478-0.372C10.722,3.553,11.022,3.316,10.91,3.316z"></path>
+            </svg>
+          </span>
+        )}
+        {(message.status === 'delivered' || message.status === 'read') && (
+          <span className={`read-receipt-icon read-receipt-delivered ${message.status === 'read' ? 'read-receipt-read' : ''}`}>
+            <svg viewBox="0 0 16 15" width="16" height="15" className="first-tick">
+              <path fill="currentColor" d="M10.91,3.316l-0.478-0.372c-0.109-0.088-0.268-0.071-0.356,0.038L5.566,8.926l-1.437-1.438c-0.1-0.099-0.262-0.099-0.361,0L3.34,7.915c-0.1,0.099-0.1,0.261,0,0.359l2.205,2.205c0.098,0.098,0.258,0.098,0.357,0c0.043-0.042,3.142-3.138,5.25-5.246l0.478-0.372C10.722,3.553,11.022,3.316,10.91,3.316z"></path>
+            </svg>
+            <svg viewBox="0 0 16 15" width="16" height="15" className="second-tick">
+              <path fill="currentColor" d="M15.01,3.316l-0.478-0.372c-0.109-0.088-0.268-0.071-0.356,0.038L9.666,8.926l-1.437-1.438c-0.1-0.099-0.262-0.099-0.361,0l-0.427,0.427c-0.1,0.099-0.1,0.261,0,0.359l2.205,2.205c0.098,0.098,0.258,0.098,0.357,0c0.043-0.042,3.142-3.138,5.25-5.246l0.478-0.372C15.822,3.553,15.022,3.316,15.01,3.316z"></path>
+            </svg>
+          </span>
+        )}
+      </span>
+    );
+  };
+
   useEffect(() => {
     if (shouldScrollToBottom && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -566,6 +610,26 @@ function ChatPage() {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeChat && socket && user) {
+      const unreadMessages = messages.filter(
+        msg => !msg.isMe && (!msg.status || msg.status !== 'read')
+      );
+      
+      if (unreadMessages.length > 0) {
+        unreadMessages.forEach(message => {
+          if (message.id) {
+            socket.emit('read_receipt', {
+              messageId: message.id,
+              chatId: activeChat,
+              reader: user.regno
+            });
+          }
+        });
+      }
+    }
+  }, [activeChat, messages, socket, user]);
 
   const handleSendChatRequest = async (data) => {
     try {
@@ -885,7 +949,10 @@ function ChatPage() {
                         )}
                         <div className="chat-message-bubble">
                           <p>{message.text}</p>
-                          <span className="chat-message-time">{message.time}</span>
+                          <span className="chat-message-time">
+                            {message.time}
+                            {renderReadReceipt(message)}
+                          </span>
                         </div>
                       </div>
                     </div>
