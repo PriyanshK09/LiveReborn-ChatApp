@@ -785,7 +785,7 @@
 }
 
 .chat-message-out .chat-message-bubble {
-  background-color: #dcf8c6;  /* WhatsApp-like green bubble color */
+  background-color:rgb(255, 178, 53);
   color: #303030;
   border-top-right-radius: 0.25rem;
 }

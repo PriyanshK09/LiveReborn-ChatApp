@@ -82,6 +82,7 @@ function ChatPage() {
   const [sendingRequest, setSendingRequest] = useState(false)
   const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768)
   const [chatUsers, setChatUsers] = useState({})
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
 
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
@@ -305,6 +306,28 @@ function ChatPage() {
     }
   }
 
+  const refreshChatsInBackground = async (userId) => {
+    if (!userId || backgroundRefreshing) return;
+    
+    try {
+      setBackgroundRefreshing(true);
+      const response = await fetch(`http://localhost:5000/api/chats/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch chats');
+      
+      const data = await response.json();
+      setChats(data);
+    } catch (error) {
+      console.error('Error refreshing chats in background:', error);
+    } finally {
+      setBackgroundRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     if (activeChat !== null && user) {
       fetchMessages(activeChat, user.regno)
@@ -472,6 +495,13 @@ function ChatPage() {
       inputRef.current.focus();
     }
   }
+
+  const handleCloseChat = () => {
+    setActiveChat(null);
+    if (user && user.regno) {
+      refreshChatsInBackground(user.regno);
+    }
+  };
 
   const handleBackdropClick = () => {
     setMobileSidebarOpen(false);
@@ -915,7 +945,11 @@ function ChatPage() {
                   <button className="chat-header-button" data-tooltip="Info">
                     <Info size={20} />
                   </button>
-                  <button className="chat-header-button" onClick={() => setActiveChat(null)} data-tooltip="Close">
+                  <button 
+                    className="chat-header-button" 
+                    onClick={handleCloseChat} 
+                    data-tooltip="Close"
+                  >
                     <X size={20} />
                   </button>
                 </div>
